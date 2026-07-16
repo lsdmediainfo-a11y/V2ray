@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "V2Ray Client",
+    "slug": "v2ray-client",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0E1A"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.v2rayclient.app",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "V2Ray proxy için yerel ağ erişimi gerekli.",
+        "UIBackgroundModes": ["network-authentication"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0E1A"
+      },
+      "package": "com.v2rayclient.app",
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "FOREGROUND_SERVICE"
+      ],
+      "versionCode": 1
+    },
+    "plugins": [
+      "expo-clipboard",
+      "expo-document-picker",
+      "expo-file-system",
+      "expo-sharing"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    }
+  }
+}
