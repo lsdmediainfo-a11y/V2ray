@@ -17,7 +17,8 @@
       "bundleIdentifier": "com.v2rayclient.app",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "V2Ray proxy için yerel ağ erişimi gerekli.",
-        "UIBackgroundModes": ["network-authentication"]
+        "UIBackgroundModes": ["network-authentication"],
+        "NSCameraUsageDescription": "QR kod taramak için kamera izni gerekiyor."
       }
     },
     "android": {
@@ -30,14 +31,18 @@
         "INTERNET",
         "ACCESS_NETWORK_STATE",
         "RECEIVE_BOOT_COMPLETED",
-        "FOREGROUND_SERVICE"
+        "FOREGROUND_SERVICE",
+        "CAMERA"
       ],
       "versionCode": 1
     },
     "plugins": [
-      "expo-document-picker",
-      "expo-file-system",
-      "expo-sharing"
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "QR kod taramak için kamera izni gerekiyor."
+        }
+      ]
     ],
     "extra": {
       "eas": {
