@@ -34,6 +34,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _lowBatterySaver = MutableStateFlow(prefs.getBoolean("low_battery_saver", true))
     val lowBatterySaver: StateFlow<Boolean> = _lowBatterySaver.asStateFlow()
 
+    private val _dnsProvider = MutableStateFlow(prefs.getString("dns_provider", "1.1.1.1 (Cloudflare)") ?: "1.1.1.1 (Cloudflare)")
+    val dnsProvider: StateFlow<String> = _dnsProvider.asStateFlow()
+
+    private val _adBlockEnabled = MutableStateFlow(prefs.getBoolean("adblock_enabled", true))
+    val adBlockEnabled: StateFlow<Boolean> = _adBlockEnabled.asStateFlow()
+
+    private val _accentTheme = MutableStateFlow(prefs.getString("accent_theme", "Neon Cyan") ?: "Neon Cyan")
+    val accentTheme: StateFlow<String> = _accentTheme.asStateFlow()
+
     init {
         loadInstalledApps()
     }
@@ -82,5 +91,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setLowBatterySaver(value: Boolean) {
         _lowBatterySaver.value = value
         prefs.edit().putBoolean("low_battery_saver", value).apply()
+    }
+
+    fun setDnsProvider(value: String) {
+        _dnsProvider.value = value
+        prefs.edit().putString("dns_provider", value).apply()
+    }
+
+    fun setAdBlockEnabled(value: Boolean) {
+        _adBlockEnabled.value = value
+        prefs.edit().putBoolean("adblock_enabled", value).apply()
+    }
+
+    fun setAccentTheme(value: String) {
+        _accentTheme.value = value
+        prefs.edit().putString("accent_theme", value).apply()
     }
 }

@@ -21,9 +21,12 @@ fun SettingsScreen(
     val killSwitch by settingsViewModel.killSwitch.collectAsState()
     val bypassLan by settingsViewModel.bypassLan.collectAsState()
     val lowBatterySaver by settingsViewModel.lowBatterySaver.collectAsState()
+    val dnsProvider by settingsViewModel.dnsProvider.collectAsState()
+    val adBlockEnabled by settingsViewModel.adBlockEnabled.collectAsState()
+    val accentTheme by settingsViewModel.accentTheme.collectAsState()
 
-    var enableMux by remember { mutableStateOf(true) }
-    var enableSniffing by remember { mutableStateOf(true) }
+    val dnsOptions = listOf("1.1.1.1 (Cloudflare)", "8.8.8.8 (Google)", "AdGuard DNS (AdBlock)")
+    val themeOptions = listOf("Neon Cyan", "Cyberpunk Purple", "Emerald Green", "Gold Amber", "AMOLED Dark")
 
     Column(
         modifier = Modifier
@@ -33,10 +36,82 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "Settings & Optimization",
+            text = "Settings & Preferences",
             style = MaterialTheme.typography.headlineMedium,
             color = TextPrimary
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // AdBlock & Custom DNS Card
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Text(text = "DNS & ADBLOCK PROTECTION", style = MaterialTheme.typography.bodyMedium, color = PrimaryNeonCyan)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Built-in Ad & Tracker Blocker", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Text(text = "Automatically blocks ads and tracking domains at V2Ray routing level", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                }
+                Switch(
+                    checked = adBlockEnabled,
+                    onCheckedChange = { settingsViewModel.setAdBlockEnabled(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = BackgroundDark,
+                        checkedTrackColor = PrimaryNeonCyan
+                    )
+                )
+            }
+
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = GlassBorder)
+
+            Text(text = "DNS Over HTTPS / Provider:", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                dnsOptions.forEach { dns ->
+                    FilterChip(
+                        selected = dnsProvider == dns,
+                        onClick = { settingsViewModel.setDnsProvider(dns) },
+                        label = { Text(dns) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = PrimaryNeonCyan,
+                            selectedLabelColor = BackgroundDark
+                        )
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Accent Theme Selector Card
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Text(text = "THEME & ACCENT COLOR", style = MaterialTheme.typography.bodyMedium, color = PrimaryNeonEmerald)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(text = "Choose UI Accent Theme:", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                themeOptions.take(3).forEach { theme ->
+                    FilterChip(
+                        selected = accentTheme == theme,
+                        onClick = { settingsViewModel.setAccentTheme(theme) },
+                        label = { Text(theme) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = PrimaryNeonEmerald,
+                            selectedLabelColor = BackgroundDark
+                        )
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -116,28 +191,6 @@ fun SettingsScreen(
                     Text(text = "Direct connection for local private networks", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 }
                 Switch(checked = bypassLan, onCheckedChange = { settingsViewModel.setBypassLan(it) })
-            }
-
-            Divider(modifier = Modifier.padding(vertical = 8.dp), color = GlassBorder)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "Enable Traffic Sniffing", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                Switch(checked = enableSniffing, onCheckedChange = { enableSniffing = it })
-            }
-
-            Divider(modifier = Modifier.padding(vertical = 8.dp), color = GlassBorder)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "Enable Mux (Multiplexing)", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                Switch(checked = enableMux, onCheckedChange = { enableMux = it })
             }
         }
 

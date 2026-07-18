@@ -206,7 +206,13 @@ object V2RayUriParser {
         return result
     }
 
-    fun generateV2RayConfigJson(profile: V2RayProfile, localSocksPort: Int = 10808, localHttpPort: Int = 10809): String {
+    fun generateV2RayConfigJson(
+        profile: V2RayProfile,
+        localSocksPort: Int = 10808,
+        localHttpPort: Int = 10809,
+        dnsServer: String = "1.1.1.1",
+        enableAdBlock: Boolean = true
+    ): String {
         val json = JsonObject()
 
         // Ultra-low CPU/RAM Logger configuration
@@ -214,6 +220,17 @@ object V2RayUriParser {
             addProperty("loglevel", "error")
         }
         json.add("log", log)
+
+        // Custom DoH / DNS Configuration
+        val dns = JsonObject().apply {
+            val servers = com.google.gson.JsonArray().apply {
+                add(dnsServer)
+                add("https://dns.adguard-dns.com/dns-query")
+                add("8.8.8.8")
+            }
+            add("servers", servers)
+        }
+        json.add("dns", dns)
 
         // Inbounds
         val inbounds = com.google.gson.JsonArray()
@@ -328,7 +345,35 @@ object V2RayUriParser {
         }
         outbounds.add(directOutbound)
 
+        val blockOutbound = JsonObject().apply {
+            addProperty("tag", "block")
+            addProperty("protocol", "blackhole")
+        }
+        outbounds.add(blockOutbound)
+
         json.add("outbounds", outbounds)
+
+        // AdBlock & Tracker Blocking Routing Rules
+        if (enableAdBlock) {
+            val routing = JsonObject().apply {
+                addProperty("domainStrategy", "IPIfNonMatch")
+                val rules = com.google.gson.JsonArray().apply {
+                    val adRule = JsonObject().apply {
+                        addProperty("type", "field")
+                        val domains = com.google.gson.JsonArray().apply {
+                            add("geosite:category-ads-all")
+                            add("domain:doubleclick.net")
+                            add("domain:adservice.google.com")
+                        }
+                        add("outboundTag", "block")
+                        add("domain", domains)
+                    }
+                    add(adRule)
+                }
+                add("rules", rules)
+            }
+            json.add("routing", routing)
+        }
 
         return Gson().toJson(json)
     }

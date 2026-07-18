@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.v2ray.compose.model.SubscriptionQuotaInfo
 import com.v2ray.compose.model.VpnStatus
 import com.v2ray.compose.ui.components.GlassCard
 import com.v2ray.compose.ui.components.LatencyBadge
@@ -45,6 +47,7 @@ fun HomeScreen(
 
     val isConnected = status == VpnStatus.CONNECTED
     val isConnecting = status == VpnStatus.CONNECTING
+    val quotaInfo = remember { SubscriptionQuotaInfo() }
 
     val statusColor by animateColorAsState(
         targetValue = when (status) {
@@ -110,6 +113,40 @@ fun HomeScreen(
             }
         }
 
+        // Subscription Quota Meter Card
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.DataUsage, contentDescription = null, tint = PrimaryNeonCyan, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("SUBSCRIPTION QUOTA", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                }
+                Text(quotaInfo.formattedRemainingDays(), style = MaterialTheme.typography.bodyMedium, color = PrimaryNeonEmerald)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { quotaInfo.usedPercentage },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = PrimaryNeonCyan,
+                trackColor = CardDark
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = "Used: ${quotaInfo.formattedUsedGb()}", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                Text(text = "Total: ${quotaInfo.formattedTotalTb()}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            }
+        }
+
         // Active Profile Selector Box & Auto Fastest Button
         Column(modifier = Modifier.fillMaxWidth()) {
             GlassCard(
@@ -148,7 +185,7 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Auto Select Fastest Button
             OutlinedButton(
@@ -178,13 +215,13 @@ fun HomeScreen(
 
         // Animated Power Button
         Box(
-            modifier = Modifier.size(180.dp),
+            modifier = Modifier.size(160.dp),
             contentAlignment = Alignment.Center
         ) {
             // Glow Ring
             Box(
                 modifier = Modifier
-                    .size(170.dp)
+                    .size(150.dp)
                     .scale(scalePulse)
                     .clip(CircleShape)
                     .background(
@@ -197,7 +234,7 @@ fun HomeScreen(
             // Outer Circle Button
             Surface(
                 modifier = Modifier
-                    .size(130.dp)
+                    .size(120.dp)
                     .clip(CircleShape)
                     .clickable { vpnViewModel.toggleVpn(onPermissionNeeded) },
                 color = CardDark,
@@ -209,7 +246,7 @@ fun HomeScreen(
                         imageVector = Icons.Default.PowerSettingsNew,
                         contentDescription = "Toggle VPN",
                         tint = statusColor,
-                        modifier = Modifier.size(60.dp)
+                        modifier = Modifier.size(56.dp)
                     )
                 }
             }
