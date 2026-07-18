@@ -20,6 +20,7 @@ fun SettingsScreen(
     val autoConnect by settingsViewModel.autoConnect.collectAsState()
     val killSwitch by settingsViewModel.killSwitch.collectAsState()
     val bypassLan by settingsViewModel.bypassLan.collectAsState()
+    val lowBatterySaver by settingsViewModel.lowBatterySaver.collectAsState()
 
     var enableMux by remember { mutableStateOf(true) }
     var enableSniffing by remember { mutableStateOf(true) }
@@ -32,10 +33,37 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "Settings & Security",
+            text = "Settings & Optimization",
             style = MaterialTheme.typography.headlineMedium,
             color = TextPrimary
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Low Battery & RAM Saver Mode Card
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Text(text = "BATTERY & RAM SAVER", style = MaterialTheme.typography.bodyMedium, color = PrimaryNeonEmerald)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Ultra Low Battery & RAM Saver", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Text(text = "Optimizes CPU wake cycles, disables verbose logs, and minimizes background RAM consumption", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                }
+                Switch(
+                    checked = lowBatterySaver,
+                    onCheckedChange = { settingsViewModel.setLowBatterySaver(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = BackgroundDark,
+                        checkedTrackColor = PrimaryNeonEmerald
+                    )
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 

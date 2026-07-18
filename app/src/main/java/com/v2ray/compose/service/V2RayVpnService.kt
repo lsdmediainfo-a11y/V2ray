@@ -2,6 +2,7 @@ package com.v2ray.compose.service
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
@@ -11,8 +12,6 @@ import com.v2ray.compose.model.VpnStatus
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.io.FileInputStream
-import java.io.FileOutputStream
 
 class V2RayVpnService : VpnService() {
 
@@ -95,22 +94,25 @@ class V2RayVpnService : VpnService() {
 
     private fun startTrafficMonitor() {
         serviceScope.launch {
-            var lastRx = 0L
-            var lastTx = 0L
             var timeSeconds = 0L
+            val prefs = getSharedPreferences("v2ray_settings", Context.MODE_PRIVATE)
 
             while (isRunning && isActive) {
-                delay(1000)
-                timeSeconds++
-                // Simulated traffic metrics for TUN device
+                val isLowBatteryMode = prefs.getBoolean("low_battery_saver", true)
+                val updateIntervalMs = if (isLowBatteryMode) 2500L else 1000L
+                delay(updateIntervalMs)
+
+                timeSeconds += (updateIntervalMs / 1000L).coerceAtLeast(1L)
+
+                // Simulated traffic metrics
                 val deltaRx = (100000..500000).random().toLong()
                 val deltaTx = (20000..150000).random().toLong()
 
                 bytesRx += deltaRx
                 bytesTx += deltaTx
 
-                val rxSpeedKbps = (deltaRx * 8) / 1000.0
-                val txSpeedKbps = (deltaTx * 8) / 1000.0
+                val rxSpeedKbps = (deltaRx * 8) / (updateIntervalMs / 1000.0)
+                val txSpeedKbps = (deltaTx * 8) / (updateIntervalMs / 1000.0)
 
                 _trafficStats.value = TrafficStats(
                     rxSpeedKbps = rxSpeedKbps,

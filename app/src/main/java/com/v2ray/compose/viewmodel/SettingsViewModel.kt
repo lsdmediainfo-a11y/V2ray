@@ -31,6 +31,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _bypassLan = MutableStateFlow(prefs.getBoolean("bypass_lan", true))
     val bypassLan: StateFlow<Boolean> = _bypassLan.asStateFlow()
 
+    private val _lowBatterySaver = MutableStateFlow(prefs.getBoolean("low_battery_saver", true))
+    val lowBatterySaver: StateFlow<Boolean> = _lowBatterySaver.asStateFlow()
+
     init {
         loadInstalledApps()
     }
@@ -74,5 +77,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setBypassLan(value: Boolean) {
         _bypassLan.value = value
         prefs.edit().putBoolean("bypass_lan", value).apply()
+    }
+
+    fun setLowBatterySaver(value: Boolean) {
+        _lowBatterySaver.value = value
+        prefs.edit().putBoolean("low_battery_saver", value).apply()
     }
 }

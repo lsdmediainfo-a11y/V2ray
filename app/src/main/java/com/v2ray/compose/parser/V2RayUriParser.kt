@@ -10,53 +10,40 @@ import java.nio.charset.StandardCharsets
 
 object V2RayUriParser {
 
-    fun parse(rawUri: String): V2RayProfile? {
-        val trimmed = rawUri.trim()
+    fun parse(uriStr: String): V2RayProfile? {
+        val trimmed = uriStr.trim()
+        return when {
+            trimmed.startsWith("vmess://", ignoreCase = true) -> parseVmess(trimmed)
+            trimmed.startsWith("vless://", ignoreCase = true) -> parseVless(trimmed)
+            trimmed.startsWith("trojan://", ignoreCase = true) -> parseTrojan(trimmed)
+            trimmed.startsWith("ss://", ignoreCase = true) -> parseShadowsocks(trimmed)
+            else -> null
+        }
+    }
+
+    private fun parseVmess(uriStr: String): V2RayProfile? {
         return try {
-            when {
-                trimmed.startsWith("vmess://", ignoreCase = true) -> parseVmess(trimmed)
-                trimmed.startsWith("vless://", ignoreCase = true) -> parseVless(trimmed)
-                trimmed.startsWith("trojan://", ignoreCase = true) -> parseTrojan(trimmed)
-                trimmed.startsWith("ss://", ignoreCase = true) -> parseShadowsocks(trimmed)
-                else -> null
-            }
+            val base64Data = uriStr.substring(8).trim()
+            val decoded = String(Base64.decode(base64Data, Base64.DEFAULT or Base64.NO_WRAP or Base64.URL_SAFE), StandardCharsets.UTF_8)
+            val json = Gson().fromJson(decoded, JsonObject::class.java)
+
+            V2RayProfile(
+                remark = json.get("ps")?.asString ?: "VMess Profile",
+                address = json.get("add")?.asString ?: "",
+                port = json.get("port")?.asInt ?: 443,
+                protocol = ProtocolType.VMESS,
+                uuidOrPassword = json.get("id")?.asString ?: "",
+                alterId = json.get("aid")?.asInt ?: 0,
+                security = json.get("scy")?.asString ?: "auto",
+                network = json.get("net")?.asString ?: "tcp",
+                sni = json.get("sni")?.asString ?: json.get("host")?.asString ?: "",
+                isTls = json.get("tls")?.asString == "tls",
+                rawUri = uriStr
+            )
         } catch (e: Exception) {
             e.printStackTrace()
             null
         }
-    }
-
-    private fun parseVmess(uriStr: String): V2RayProfile {
-        val base64Content = uriStr.substring(8)
-        var cleaned = base64Content.replace("\n", "").replace("\r", "").trim()
-        while (cleaned.length % 4 != 0) cleaned += "="
-
-        val decoded = String(Base64.decode(cleaned, Base64.DEFAULT or Base64.NO_WRAP or Base64.URL_SAFE), StandardCharsets.UTF_8)
-        val json = Gson().fromJson(decoded, JsonObject::class.java)
-
-        val remark = json.get("ps")?.asString ?: "VMess Profile"
-        val add = json.get("add")?.asString ?: ""
-        val port = json.get("port")?.asInt ?: 443
-        val id = json.get("id")?.asString ?: ""
-        val aid = json.get("aid")?.asInt ?: 0
-        val net = json.get("net")?.asString ?: "tcp"
-        val host = json.get("host")?.asString ?: ""
-        val path = json.get("path")?.asString ?: ""
-        val tls = json.get("tls")?.asString ?: ""
-
-        return V2RayProfile(
-            remark = remark,
-            address = add,
-            port = port,
-            protocol = ProtocolType.VMESS,
-            uuidOrPassword = id,
-            alterId = aid,
-            network = net,
-            host = host,
-            path = path,
-            isTls = tls.equals("tls", ignoreCase = true),
-            rawUri = uriStr
-        )
     }
 
     private fun parseVless(uriStr: String): V2RayProfile {
@@ -69,12 +56,14 @@ object V2RayUriParser {
             remark = try { URLDecoder.decode(parts[1], "UTF-8") } catch (e: Exception) { parts[1] }
         }
 
-        var queryParams = emptyMap<String, String>()
+        var queryStr: String? = null
         if (rest.contains("?")) {
             val parts = rest.split("?", limit = 2)
             rest = parts[0]
-            queryParams = parseQueryParams(parts[1])
+            queryStr = parts[1]
         }
+
+        val queryParams = parseQueryParams(queryStr)
 
         var uuid = ""
         var hostPort = rest
@@ -84,39 +73,31 @@ object V2RayUriParser {
             hostPort = parts[1]
         }
 
-        var host = hostPort
+        var address = hostPort
         var port = 443
         if (hostPort.contains(":")) {
             val parts = hostPort.split(":", limit = 2)
-            host = parts[0]
+            address = parts[0]
             port = parts[1].toIntOrNull() ?: 443
         }
 
-        val type = queryParams["type"] ?: "tcp"
-        val security = queryParams["security"] ?: "none"
-        val sni = queryParams["sni"] ?: ""
-        val path = queryParams["path"] ?: ""
-        val pbk = queryParams["pbk"] ?: queryParams["public-key"] ?: queryParams["publicKey"] ?: ""
-        val sid = queryParams["sid"] ?: queryParams["short-id"] ?: queryParams["shortId"] ?: ""
-        val fp = queryParams["fp"] ?: queryParams["fingerprint"] ?: "chrome"
-
-        val isReality = security.equals("reality", ignoreCase = true) || pbk.isNotEmpty()
-        val isTls = security.equals("tls", ignoreCase = true) || isReality
+        val securityParam = queryParams["security"] ?: ""
+        val isReality = securityParam.equals("reality", ignoreCase = true)
+        val isTls = isReality || securityParam.equals("tls", ignoreCase = true)
 
         return V2RayProfile(
             remark = remark,
-            address = host,
+            address = address,
             port = port,
             protocol = ProtocolType.VLESS,
             uuidOrPassword = uuid,
-            network = type,
-            sni = sni,
-            path = path,
+            sni = queryParams["sni"] ?: queryParams["host"] ?: "",
+            network = queryParams["type"] ?: queryParams["net"] ?: "tcp",
             isTls = isTls,
             isReality = isReality,
-            publicKey = pbk,
-            shortId = sid,
-            fingerprint = fp,
+            publicKey = queryParams["pbk"] ?: queryParams["public-key"] ?: "",
+            shortId = queryParams["sid"] ?: queryParams["short-id"] ?: "",
+            fingerprint = queryParams["fp"] ?: queryParams["fingerprint"] ?: "chrome",
             rawUri = uriStr
         )
     }
@@ -131,12 +112,14 @@ object V2RayUriParser {
             remark = try { URLDecoder.decode(parts[1], "UTF-8") } catch (e: Exception) { parts[1] }
         }
 
-        var queryParams = emptyMap<String, String>()
+        var queryStr: String? = null
         if (rest.contains("?")) {
             val parts = rest.split("?", limit = 2)
             rest = parts[0]
-            queryParams = parseQueryParams(parts[1])
+            queryStr = parts[1]
         }
+
+        val queryParams = parseQueryParams(queryStr)
 
         var password = ""
         var hostPort = rest
@@ -146,25 +129,22 @@ object V2RayUriParser {
             hostPort = parts[1]
         }
 
-        var host = hostPort
+        var address = hostPort
         var port = 443
         if (hostPort.contains(":")) {
             val parts = hostPort.split(":", limit = 2)
-            host = parts[0]
+            address = parts[0]
             port = parts[1].toIntOrNull() ?: 443
         }
 
-        val type = queryParams["type"] ?: "tcp"
-        val sni = queryParams["sni"] ?: ""
-
         return V2RayProfile(
             remark = remark,
-            address = host,
+            address = address,
             port = port,
             protocol = ProtocolType.TROJAN,
             uuidOrPassword = password,
-            network = type,
-            sni = sni,
+            sni = queryParams["sni"] ?: queryParams["peer"] ?: "",
+            network = queryParams["type"] ?: "tcp",
             isTls = true,
             rawUri = uriStr
         )
@@ -228,6 +208,12 @@ object V2RayUriParser {
 
     fun generateV2RayConfigJson(profile: V2RayProfile, localSocksPort: Int = 10808, localHttpPort: Int = 10809): String {
         val json = JsonObject()
+
+        // Ultra-low CPU/RAM Logger configuration
+        val log = JsonObject().apply {
+            addProperty("loglevel", "error")
+        }
+        json.add("log", log)
 
         // Inbounds
         val inbounds = com.google.gson.JsonArray()
