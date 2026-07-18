@@ -132,7 +132,7 @@ object V2RayUriParser {
     }
 
     private fun parseQueryParams(query: String?): Map<String, String> {
-        if (query.isNull_or_empty()) return emptyMap()
+        if (query.isNullOrEmpty()) return emptyMap()
         val result = mutableMapOf<String, String>()
         for (param in query.split("&")) {
             val pair = param.split("=")
@@ -142,8 +142,6 @@ object V2RayUriParser {
         }
         return result
     }
-
-    private fun String?.isNull_or_empty(): Boolean = this == null || this.isEmpty()
 
     fun generateV2RayConfigJson(profile: V2RayProfile, localSocksPort: Int = 10808, localHttpPort: Int = 10809): String {
         val json = JsonObject()
