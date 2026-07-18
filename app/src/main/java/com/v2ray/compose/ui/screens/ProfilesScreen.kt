@@ -29,22 +29,19 @@ import com.v2ray.compose.ui.theme.*
 import com.v2ray.compose.viewmodel.ProfilesViewModel
 import java.util.Locale
 
-// Dynamic Category Extractor helper
+// Dynamic Category Extractor based strictly on the FIRST WORD of profile remark
 fun V2RayProfile.extractDynamicCategory(): String {
     if (isReality) return "REALITY"
     val cleaned = remark.replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF\\u2600-\\u27FF\\u2300-\\u23FF]"), "").trim()
     if (cleaned.isEmpty() || remark.contains("TB") || remark.contains("GB") || remark.contains("Days")) {
         return "Info"
     }
-    val delimiters = listOf("-", "|", "_", ":", "(", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
-    var firstPart = cleaned
-    for (d in delimiters) {
-        if (firstPart.contains(d)) {
-            firstPart = firstPart.split(d)[0]
-        }
+    val firstWord = Regex("[A-Za-z]+").find(cleaned)?.value
+    return if (!firstWord.isNullOrEmpty()) {
+        firstWord.lowercase(Locale.getDefault()).replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+    } else {
+        "General"
     }
-    val token = firstPart.trim()
-    return if (token.isNotEmpty()) token.substring(0, 1).uppercase(Locale.getDefault()) + token.substring(1).lowercase(Locale.getDefault()) else "General"
 }
 
 @Composable
@@ -62,7 +59,7 @@ fun ProfilesScreen(
     var editingProfile by remember { mutableStateOf<V2RayProfile?>(null) }
     var importText by remember { mutableStateOf("") }
 
-    // Dynamically calculate category list based on currently loaded profiles
+    // Dynamically calculate category list based strictly on the FIRST WORD of profile remarks
     val dynamicCategories = remember(profiles) {
         val catCounts = mutableMapOf<String, Int>()
         profiles.forEach { profile ->
@@ -163,7 +160,7 @@ fun ProfilesScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Dynamic Category Filter Chips
+            // Dynamic First-Word Category Filter Chips
             if (dynamicCategories.size > 1) {
                 Row(
                     modifier = Modifier
