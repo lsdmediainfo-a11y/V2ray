@@ -13,9 +13,10 @@ object SubscriptionParser {
     suspend fun fetchSubscription(subscriptionUrl: String): List<V2RayProfile> = withContext(Dispatchers.IO) {
         val url = URL(subscriptionUrl)
         val connection = url.openConnection() as HttpURLConnection
-        connection.connectTimeout = 10000
-        connection.readTimeout = 10000
+        connection.connectTimeout = 15000
+        connection.readTimeout = 15000
         connection.requestMethod = "GET"
+        connection.setRequestProperty("User-Agent", "v2rayNG/1.8.5")
 
         try {
             val responseCode = connection.responseCode
@@ -47,7 +48,10 @@ object SubscriptionParser {
 
     private fun decodeSubscriptionContent(content: String): String {
         return try {
-            val cleaned = content.replace("\n", "").replace("\r", "").trim()
+            var cleaned = content.replace("\n", "").replace("\r", "").replace(" ", "").trim()
+            while (cleaned.length % 4 != 0) {
+                cleaned += "="
+            }
             val bytes = Base64.decode(cleaned, Base64.DEFAULT or Base64.NO_WRAP or Base64.URL_SAFE)
             String(bytes, StandardCharsets.UTF_8)
         } catch (e: Exception) {

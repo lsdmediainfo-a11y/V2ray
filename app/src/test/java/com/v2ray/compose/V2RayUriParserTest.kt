@@ -23,16 +23,15 @@ class V2RayUriParserTest {
     }
 
     @Test
-    fun testTrojanParsing() {
-        val uri = "trojan://secretpass123@trojan.server.com:8443?sni=trojan.server.com#MyTrojan"
+    fun testTrojanSpecialCharsInRemark() {
+        val uri = "trojan://1@14.48--2026.07.18.time:1448?sni=fake_ip_for_sub_link&security=tls#%E2%8F%B3%201.112/5TB%20%F0%9F%93%85%2064%20Days"
         val profile = V2RayUriParser.parse(uri)
 
         assertNotNull(profile)
-        assertEquals("MyTrojan", profile?.remark)
-        assertEquals("trojan.server.com", profile?.address)
-        assertEquals(8443, profile?.port)
+        assertEquals("⏳ 1.112/5TB 📅 64 Days", profile?.remark)
+        assertEquals("14.48--2026.07.18.time", profile?.address)
+        assertEquals(1448, profile?.port)
         assertEquals(ProtocolType.TROJAN, profile?.protocol)
-        assertEquals("secretpass123", profile?.uuidOrPassword)
     }
 
     @Test

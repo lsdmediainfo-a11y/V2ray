@@ -5,7 +5,6 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.v2ray.compose.model.ProtocolType
 import com.v2ray.compose.model.V2RayProfile
-import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
@@ -29,7 +28,10 @@ object V2RayUriParser {
 
     private fun parseVmess(uriStr: String): V2RayProfile {
         val base64Content = uriStr.substring(8)
-        val decoded = String(Base64.decode(base64Content, Base64.DEFAULT or Base64.NO_WRAP or Base64.URL_SAFE), StandardCharsets.UTF_8)
+        var cleaned = base64Content.replace("\n", "").replace("\r", "").trim()
+        while (cleaned.length % 4 != 0) cleaned += "="
+
+        val decoded = String(Base64.decode(cleaned, Base64.DEFAULT or Base64.NO_WRAP or Base64.URL_SAFE), StandardCharsets.UTF_8)
         val json = Gson().fromJson(decoded, JsonObject::class.java)
 
         val remark = json.get("ps")?.asString ?: "VMess Profile"
@@ -58,13 +60,38 @@ object V2RayUriParser {
     }
 
     private fun parseVless(uriStr: String): V2RayProfile {
-        val uri = URI(uriStr)
-        val uuid = uri.userInfo ?: ""
-        val host = uri.host ?: ""
-        val port = if (uri.port != -1) uri.port else 443
-        val remark = uri.fragment?.let { URLDecoder.decode(it, "UTF-8") } ?: "VLESS Profile"
+        var rest = uriStr.substring(8)
+        var remark = "VLESS Profile"
 
-        val queryParams = parseQueryParams(uri.query)
+        if (rest.contains("#")) {
+            val parts = rest.split("#", limit = 2)
+            rest = parts[0]
+            remark = try { URLDecoder.decode(parts[1], "UTF-8") } catch (e: Exception) { parts[1] }
+        }
+
+        var queryParams = emptyMap<String, String>()
+        if (rest.contains("?")) {
+            val parts = rest.split("?", limit = 2)
+            rest = parts[0]
+            queryParams = parseQueryParams(parts[1])
+        }
+
+        var uuid = ""
+        var hostPort = rest
+        if (rest.contains("@")) {
+            val parts = rest.split("@", limit = 2)
+            uuid = parts[0]
+            hostPort = parts[1]
+        }
+
+        var host = hostPort
+        var port = 443
+        if (hostPort.contains(":")) {
+            val parts = hostPort.split(":", limit = 2)
+            host = parts[0]
+            port = parts[1].toIntOrNull() ?: 443
+        }
+
         val type = queryParams["type"] ?: "tcp"
         val security = queryParams["security"] ?: "none"
         val sni = queryParams["sni"] ?: ""
@@ -85,13 +112,38 @@ object V2RayUriParser {
     }
 
     private fun parseTrojan(uriStr: String): V2RayProfile {
-        val uri = URI(uriStr)
-        val password = uri.userInfo ?: ""
-        val host = uri.host ?: ""
-        val port = if (uri.port != -1) uri.port else 443
-        val remark = uri.fragment?.let { URLDecoder.decode(it, "UTF-8") } ?: "Trojan Profile"
+        var rest = uriStr.substring(9)
+        var remark = "Trojan Profile"
 
-        val queryParams = parseQueryParams(uri.query)
+        if (rest.contains("#")) {
+            val parts = rest.split("#", limit = 2)
+            rest = parts[0]
+            remark = try { URLDecoder.decode(parts[1], "UTF-8") } catch (e: Exception) { parts[1] }
+        }
+
+        var queryParams = emptyMap<String, String>()
+        if (rest.contains("?")) {
+            val parts = rest.split("?", limit = 2)
+            rest = parts[0]
+            queryParams = parseQueryParams(parts[1])
+        }
+
+        var password = ""
+        var hostPort = rest
+        if (rest.contains("@")) {
+            val parts = rest.split("@", limit = 2)
+            password = parts[0]
+            hostPort = parts[1]
+        }
+
+        var host = hostPort
+        var port = 443
+        if (hostPort.contains(":")) {
+            val parts = hostPort.split(":", limit = 2)
+            host = parts[0]
+            port = parts[1].toIntOrNull() ?: 443
+        }
+
         val type = queryParams["type"] ?: "tcp"
         val sni = queryParams["sni"] ?: ""
 
@@ -109,11 +161,30 @@ object V2RayUriParser {
     }
 
     private fun parseShadowsocks(uriStr: String): V2RayProfile {
-        val uri = URI(uriStr)
-        val remark = uri.fragment?.let { URLDecoder.decode(it, "UTF-8") } ?: "Shadowsocks Profile"
-        val host = uri.host ?: ""
-        val port = if (uri.port != -1) uri.port else 8388
-        val userInfo = uri.userInfo ?: ""
+        var rest = uriStr.substring(5)
+        var remark = "Shadowsocks Profile"
+
+        if (rest.contains("#")) {
+            val parts = rest.split("#", limit = 2)
+            rest = parts[0]
+            remark = try { URLDecoder.decode(parts[1], "UTF-8") } catch (e: Exception) { parts[1] }
+        }
+
+        var userInfo = ""
+        var hostPort = rest
+        if (rest.contains("@")) {
+            val parts = rest.split("@", limit = 2)
+            userInfo = parts[0]
+            hostPort = parts[1]
+        }
+
+        var host = hostPort
+        var port = 8388
+        if (hostPort.contains(":")) {
+            val parts = hostPort.split(":", limit = 2)
+            host = parts[0]
+            port = parts[1].toIntOrNull() ?: 8388
+        }
 
         val decodedUser = try {
             String(Base64.decode(userInfo, Base64.DEFAULT or Base64.NO_WRAP or Base64.URL_SAFE), StandardCharsets.UTF_8)
@@ -135,9 +206,11 @@ object V2RayUriParser {
         if (query.isNullOrEmpty()) return emptyMap()
         val result = mutableMapOf<String, String>()
         for (param in query.split("&")) {
-            val pair = param.split("=")
+            val pair = param.split("=", limit = 2)
             if (pair.size == 2) {
-                result[URLDecoder.decode(pair[0], "UTF-8")] = URLDecoder.decode(pair[1], "UTF-8")
+                val k = try { URLDecoder.decode(pair[0], "UTF-8") } catch (e: Exception) { pair[0] }
+                val v = try { URLDecoder.decode(pair[1], "UTF-8") } catch (e: Exception) { pair[1] }
+                result[k] = v
             }
         }
         return result
