@@ -42,6 +42,12 @@ class ProfilesViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun saveProfile(profile: V2RayProfile) {
+        viewModelScope.launch {
+            db.insertProfile(ProfileEntity.fromDomainModel(profile))
+        }
+    }
+
     fun importFromUri(uriStr: String): Boolean {
         val parsed = V2RayUriParser.parse(uriStr) ?: return false
         viewModelScope.launch {

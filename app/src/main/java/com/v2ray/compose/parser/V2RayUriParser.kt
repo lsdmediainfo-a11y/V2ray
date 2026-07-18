@@ -96,6 +96,12 @@ object V2RayUriParser {
         val security = queryParams["security"] ?: "none"
         val sni = queryParams["sni"] ?: ""
         val path = queryParams["path"] ?: ""
+        val pbk = queryParams["pbk"] ?: queryParams["public-key"] ?: queryParams["publicKey"] ?: ""
+        val sid = queryParams["sid"] ?: queryParams["short-id"] ?: queryParams["shortId"] ?: ""
+        val fp = queryParams["fp"] ?: queryParams["fingerprint"] ?: "chrome"
+
+        val isReality = security.equals("reality", ignoreCase = true) || pbk.isNotEmpty()
+        val isTls = security.equals("tls", ignoreCase = true) || isReality
 
         return V2RayProfile(
             remark = remark,
@@ -106,7 +112,11 @@ object V2RayUriParser {
             network = type,
             sni = sni,
             path = path,
-            isTls = security.equals("tls", ignoreCase = true) || security.equals("reality", ignoreCase = true),
+            isTls = isTls,
+            isReality = isReality,
+            publicKey = pbk,
+            shortId = sid,
+            fingerprint = fp,
             rawUri = uriStr
         )
     }
@@ -267,6 +277,9 @@ object V2RayUriParser {
                         users.add(JsonObject().apply {
                             addProperty("id", profile.uuidOrPassword)
                             addProperty("encryption", "none")
+                            if (profile.isReality) {
+                                addProperty("flow", "xtls-rprx-vision")
+                            }
                         })
                         add("users", users)
                     }
@@ -300,8 +313,17 @@ object V2RayUriParser {
 
             // StreamSettings
             val streamSettings = JsonObject().apply {
-                addProperty("network", profile.network)
-                if (profile.isTls) {
+                addProperty("network", profile.network.ifEmpty { "tcp" })
+                if (profile.isReality) {
+                    addProperty("security", "reality")
+                    val realitySettings = JsonObject().apply {
+                        if (profile.sni.isNotEmpty()) addProperty("serverName", profile.sni)
+                        if (profile.publicKey.isNotEmpty()) addProperty("publicKey", profile.publicKey)
+                        if (profile.shortId.isNotEmpty()) addProperty("shortId", profile.shortId)
+                        addProperty("fingerprint", if (profile.fingerprint.isNotEmpty()) profile.fingerprint else "chrome")
+                    }
+                    add("realitySettings", realitySettings)
+                } else if (profile.isTls) {
                     addProperty("security", "tls")
                     val tlsSettings = JsonObject().apply {
                         if (profile.sni.isNotEmpty()) addProperty("serverName", profile.sni)
