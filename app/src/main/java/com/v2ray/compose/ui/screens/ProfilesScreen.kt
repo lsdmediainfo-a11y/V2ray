@@ -27,6 +27,25 @@ import com.v2ray.compose.ui.components.GlassCard
 import com.v2ray.compose.ui.components.LatencyBadge
 import com.v2ray.compose.ui.theme.*
 import com.v2ray.compose.viewmodel.ProfilesViewModel
+import java.util.Locale
+
+// Dynamic Category Extractor helper
+fun V2RayProfile.extractDynamicCategory(): String {
+    if (isReality) return "REALITY"
+    val cleaned = remark.replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF\\u2600-\\u27FF\\u2300-\\u23FF]"), "").trim()
+    if (cleaned.isEmpty() || remark.contains("TB") || remark.contains("GB") || remark.contains("Days")) {
+        return "Info"
+    }
+    val delimiters = listOf("-", "|", "_", ":", "(", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+    var firstPart = cleaned
+    for (d in delimiters) {
+        if (firstPart.contains(d)) {
+            firstPart = firstPart.split(d)[0]
+        }
+    }
+    val token = firstPart.trim()
+    return if (token.isNotEmpty()) token.substring(0, 1).uppercase(Locale.getDefault()) + token.substring(1).lowercase(Locale.getDefault()) else "General"
+}
 
 @Composable
 fun ProfilesScreen(
@@ -43,18 +62,23 @@ fun ProfilesScreen(
     var editingProfile by remember { mutableStateOf<V2RayProfile?>(null) }
     var importText by remember { mutableStateOf("") }
 
-    val categories = listOf("All", "WhatsApp", "YouTube", "Telegram", "Social", "AI & Tools", "REALITY")
+    // Dynamically calculate category list based on currently loaded profiles
+    val dynamicCategories = remember(profiles) {
+        val catCounts = mutableMapOf<String, Int>()
+        profiles.forEach { profile ->
+            val cat = profile.extractDynamicCategory()
+            catCounts[cat] = (catCounts[cat] ?: 0) + 1
+        }
+        val sortedCats = catCounts.entries.sortedByDescending { it.value }.map { it.key }
+        listOf("All") + sortedCats
+    }
 
     val filteredProfiles = remember(profiles, searchQuery, selectedCategory) {
         profiles.filter { profile ->
-            val matchesCategory = when (selectedCategory) {
-                "WhatsApp" -> profile.remark.contains("whatsapp", ignoreCase = true) || profile.sni.contains("whatsapp", ignoreCase = true)
-                "YouTube" -> profile.remark.contains("youtube", ignoreCase = true) || profile.sni.contains("youtube", ignoreCase = true)
-                "Telegram" -> profile.remark.contains("telegram", ignoreCase = true) || profile.sni.contains("telegram", ignoreCase = true)
-                "Social" -> profile.remark.contains("tiktok", ignoreCase = true) || profile.remark.contains("instagram", ignoreCase = true) || profile.remark.contains("spotify", ignoreCase = true)
-                "AI & Tools" -> profile.remark.contains("chatgpt", ignoreCase = true) || profile.remark.contains("speedtest", ignoreCase = true) || profile.remark.contains("gigsky", ignoreCase = true) || profile.remark.contains("redbull", ignoreCase = true)
-                "REALITY" -> profile.isReality
-                else -> true
+            val matchesCategory = if (selectedCategory == "All") {
+                true
+            } else {
+                profile.extractDynamicCategory().equals(selectedCategory, ignoreCase = true)
             }
 
             val matchesSearch = searchQuery.isEmpty() ||
@@ -128,7 +152,7 @@ fun ProfilesScreen(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search profiles (WhatsApp, YouTube, etc.)...") },
+                placeholder = { Text("Search profiles...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = PrimaryNeonCyan,
@@ -139,43 +163,36 @@ fun ProfilesScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Category Filter Chips
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                categories.forEach { cat ->
-                    val count = remember(profiles, cat) {
-                        profiles.count { profile ->
-                            when (cat) {
-                                "WhatsApp" -> profile.remark.contains("whatsapp", ignoreCase = true) || profile.sni.contains("whatsapp", ignoreCase = true)
-                                "YouTube" -> profile.remark.contains("youtube", ignoreCase = true) || profile.sni.contains("youtube", ignoreCase = true)
-                                "Telegram" -> profile.remark.contains("telegram", ignoreCase = true) || profile.sni.contains("telegram", ignoreCase = true)
-                                "Social" -> profile.remark.contains("tiktok", ignoreCase = true) || profile.remark.contains("instagram", ignoreCase = true) || profile.remark.contains("spotify", ignoreCase = true)
-                                "AI & Tools" -> profile.remark.contains("chatgpt", ignoreCase = true) || profile.remark.contains("speedtest", ignoreCase = true) || profile.remark.contains("gigsky", ignoreCase = true) || profile.remark.contains("redbull", ignoreCase = true)
-                                "REALITY" -> profile.isReality
-                                else -> true
-                            }
+            // Dynamic Category Filter Chips
+            if (dynamicCategories.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    dynamicCategories.forEach { cat ->
+                        val count = remember(profiles, cat) {
+                            if (cat == "All") profiles.size
+                            else profiles.count { it.extractDynamicCategory().equals(cat, ignoreCase = true) }
                         }
-                    }
 
-                    FilterChip(
-                        selected = selectedCategory == cat,
-                        onClick = { selectedCategory = cat },
-                        label = { Text("$cat ($count)") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = PrimaryNeonCyan,
-                            selectedLabelColor = BackgroundDark,
-                            containerColor = CardDark,
-                            labelColor = TextPrimary
+                        FilterChip(
+                            selected = selectedCategory.equals(cat, ignoreCase = true),
+                            onClick = { selectedCategory = cat },
+                            label = { Text("$cat ($count)") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = PrimaryNeonCyan,
+                                selectedLabelColor = BackgroundDark,
+                                containerColor = CardDark,
+                                labelColor = TextPrimary
+                            )
                         )
-                    )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             if (filteredProfiles.isEmpty()) {
                 Box(
