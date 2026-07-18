@@ -10,9 +10,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,24 +23,25 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.v2ray.compose.model.V2RayProfile
 import com.v2ray.compose.model.VpnStatus
 import com.v2ray.compose.ui.components.GlassCard
 import com.v2ray.compose.ui.components.LatencyBadge
 import com.v2ray.compose.ui.components.LiveSpeedMeter
 import com.v2ray.compose.ui.theme.*
+import com.v2ray.compose.viewmodel.ProfilesViewModel
 import com.v2ray.compose.viewmodel.VpnViewModel
 
 @Composable
 fun HomeScreen(
     vpnViewModel: VpnViewModel,
+    profilesViewModel: ProfilesViewModel,
     onNavigateToProfiles: () -> Unit,
     onPermissionNeeded: (Intent) -> Unit
 ) {
     val status by vpnViewModel.vpnStatus.collectAsState()
     val stats by vpnViewModel.trafficStats.collectAsState()
     val activeProfile by vpnViewModel.activeProfile.collectAsState()
+    val isTestingPing by profilesViewModel.isTestingPing.collectAsState()
 
     val isConnected = status == VpnStatus.CONNECTED
     val isConnecting = status == VpnStatus.CONNECTING
@@ -109,52 +110,81 @@ fun HomeScreen(
             }
         }
 
-        // Active Profile Selector Box
-        GlassCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onNavigateToProfiles() }
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        // Active Profile Selector Box & Auto Fastest Button
+        Column(modifier = Modifier.fillMaxWidth()) {
+            GlassCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigateToProfiles() }
             ) {
-                Column {
-                    Text(
-                        text = "SELECTED SERVER",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = activeProfile?.remark ?: "No Profile Selected",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimary
-                    )
-                    if (activeProfile != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
                         Text(
-                            text = "${activeProfile!!.protocol.displayName} • ${activeProfile!!.address}:${activeProfile!!.port}",
+                            text = "SELECTED SERVER",
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondary
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = activeProfile?.remark ?: "No Profile Selected",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary
+                        )
+                        if (activeProfile != null) {
+                            Text(
+                                text = "${activeProfile!!.protocol.displayName} • ${activeProfile!!.address}:${activeProfile!!.port}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                    if (activeProfile != null) {
+                        LatencyBadge(pingMs = activeProfile!!.pingMs)
                     }
                 }
-                if (activeProfile != null) {
-                    LatencyBadge(pingMs = activeProfile!!.pingMs)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Auto Select Fastest Button
+            OutlinedButton(
+                onClick = {
+                    profilesViewModel.selectFastestProfile { fastest ->
+                        if (fastest != null && !isConnected) {
+                            vpnViewModel.toggleVpn(onPermissionNeeded)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isTestingPing,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryNeonEmerald),
+                border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryNeonEmerald)
+            ) {
+                if (isTestingPing) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = PrimaryNeonEmerald)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Pinging & Finding Fastest Server...")
+                } else {
+                    Icon(Icons.Default.Bolt, contentDescription = null, tint = PrimaryNeonEmerald)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Connect to Fastest Server (Auto Ping)")
                 }
             }
         }
 
         // Animated Power Button
         Box(
-            modifier = Modifier.size(200.dp),
+            modifier = Modifier.size(180.dp),
             contentAlignment = Alignment.Center
         ) {
             // Glow Ring
             Box(
                 modifier = Modifier
-                    .size(190.dp)
+                    .size(170.dp)
                     .scale(scalePulse)
                     .clip(CircleShape)
                     .background(
@@ -167,7 +197,7 @@ fun HomeScreen(
             // Outer Circle Button
             Surface(
                 modifier = Modifier
-                    .size(140.dp)
+                    .size(130.dp)
                     .clip(CircleShape)
                     .clickable { vpnViewModel.toggleVpn(onPermissionNeeded) },
                 color = CardDark,
@@ -179,13 +209,13 @@ fun HomeScreen(
                         imageVector = Icons.Default.PowerSettingsNew,
                         contentDescription = "Toggle VPN",
                         tint = statusColor,
-                        modifier = Modifier.size(64.dp)
+                        modifier = Modifier.size(60.dp)
                     )
                 }
             }
         }
 
-        // Traffic Speed Meter
+        // Traffic Speed Meter with Neon Wave Canvas Graph
         LiveSpeedMeter(
             uploadSpeedKbps = if (isConnected) stats.txSpeedKbps else 0.0,
             downloadSpeedKbps = if (isConnected) stats.rxSpeedKbps else 0.0,

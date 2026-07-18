@@ -10,6 +10,8 @@ import com.v2ray.compose.parser.SubscriptionParser
 import com.v2ray.compose.parser.V2RayUriParser
 import com.v2ray.compose.service.PingManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -78,11 +80,35 @@ class ProfilesViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             _isTestingPing.value = true
             val list = _profiles.value
-            for (p in list) {
-                val ping = PingManager.pingTcp(p.address, p.port)
-                db.updatePing(p.id, ping)
+            val jobs = list.map { p ->
+                async {
+                    val ping = PingManager.pingTcp(p.address, p.port)
+                    db.updatePing(p.id, ping)
+                }
+            }
+            jobs.awaitAll()
+            _isTestingPing.value = false
+        }
+    }
+
+    fun selectFastestProfile(onComplete: ((V2RayProfile?) -> Unit)? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isTestingPing.value = true
+            val list = _profiles.value
+            val pingResults = list.map { p ->
+                async {
+                    val ping = PingManager.pingTcp(p.address, p.port)
+                    db.updatePing(p.id, ping)
+                    p.copy(pingMs = ping)
+                }
+            }.awaitAll()
+
+            val fastest = pingResults.filter { it.pingMs > 0 }.minByOrNull { it.pingMs }
+            if (fastest != null) {
+                db.selectProfile(fastest.id)
             }
             _isTestingPing.value = false
+            onComplete?.invoke(fastest)
         }
     }
 }

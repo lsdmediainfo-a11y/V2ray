@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
                 composable("home") {
                     HomeScreen(
                         vpnViewModel = vpnViewModel,
+                        profilesViewModel = profilesViewModel,
                         onNavigateToProfiles = { navController.navigate("profiles") },
                         onPermissionNeeded = { intent -> vpnPermissionLauncher.launch(intent) }
                     )
@@ -138,7 +139,7 @@ class MainActivity : ComponentActivity() {
                     SplitTunnelingScreen(settingsViewModel = settingsViewModel)
                 }
                 composable("settings") {
-                    SettingsScreen()
+                    SettingsScreen(settingsViewModel = settingsViewModel)
                 }
             }
         }

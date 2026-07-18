@@ -2,7 +2,8 @@ package com.v2ray.compose.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -10,30 +11,37 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.v2ray.compose.ui.components.GlassCard
 import com.v2ray.compose.ui.theme.*
+import com.v2ray.compose.viewmodel.SettingsViewModel
 
 @Composable
-fun SettingsScreen() {
-    var autoConnect by remember { mutableStateOf(false) }
+fun SettingsScreen(
+    settingsViewModel: SettingsViewModel
+) {
+    val autoConnect by settingsViewModel.autoConnect.collectAsState()
+    val killSwitch by settingsViewModel.killSwitch.collectAsState()
+    val bypassLan by settingsViewModel.bypassLan.collectAsState()
+
     var enableMux by remember { mutableStateOf(true) }
     var enableSniffing by remember { mutableStateOf(true) }
-    var dnsServer by remember { mutableStateOf("1.1.1.1 (Cloudflare)") }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundDark)
             .padding(16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "Settings",
+            text = "Settings & Security",
             style = MaterialTheme.typography.headlineMedium,
             color = TextPrimary
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Security & Kill Switch Card
         GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Text(text = "CONNECTION & ROUTING", style = MaterialTheme.typography.bodyMedium, color = PrimaryNeonCyan)
+            Text(text = "SECURITY & PROTECTION", style = MaterialTheme.typography.bodyMedium, color = StatusDisconnected)
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(
@@ -41,8 +49,45 @@ fun SettingsScreen() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "Auto Connect on Boot", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                Switch(checked = autoConnect, onCheckedChange = { autoConnect = it })
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "VPN Kill Switch", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Text(text = "Block all internet traffic if VPN connection drops", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                }
+                Switch(checked = killSwitch, onCheckedChange = { settingsViewModel.setKillSwitch(it) })
+            }
+
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = GlassBorder)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Auto-Connect on Boot", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Text(text = "Connect to selected profile when device starts", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                }
+                Switch(checked = autoConnect, onCheckedChange = { settingsViewModel.setAutoConnect(it) })
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Connection & Routing Card
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Text(text = "ROUTING & PROTOCOL", style = MaterialTheme.typography.bodyMedium, color = PrimaryNeonCyan)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Bypass LAN & Local Traffic", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Text(text = "Direct connection for local private networks", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                }
+                Switch(checked = bypassLan, onCheckedChange = { settingsViewModel.setBypassLan(it) })
             }
 
             Divider(modifier = Modifier.padding(vertical = 8.dp), color = GlassBorder)
@@ -70,8 +115,9 @@ fun SettingsScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Core Info Card
         GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Text(text = "CORE INFO", style = MaterialTheme.typography.bodyMedium, color = PrimaryNeonEmerald)
+            Text(text = "ENGINE & CORE INFO", style = MaterialTheme.typography.bodyMedium, color = PrimaryNeonEmerald)
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(text = "V2Ray Core Version: v5.12.1", style = MaterialTheme.typography.titleMedium, color = TextPrimary)

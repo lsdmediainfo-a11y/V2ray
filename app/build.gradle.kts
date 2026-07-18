@@ -71,8 +71,9 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
 
-    // Gson & Coroutines
+    // Gson, ZXing & Coroutines
     implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.zxing:core:3.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     // Testing

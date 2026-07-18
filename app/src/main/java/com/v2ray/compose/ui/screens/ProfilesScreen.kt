@@ -1,5 +1,6 @@
 package com.v2ray.compose.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,20 +13,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import com.v2ray.compose.model.ProtocolType
 import com.v2ray.compose.model.V2RayProfile
 import com.v2ray.compose.ui.components.GlassCard
 import com.v2ray.compose.ui.components.LatencyBadge
 import com.v2ray.compose.ui.theme.*
+import com.v2ray.compose.utils.QrCodeUtils
 import com.v2ray.compose.viewmodel.ProfilesViewModel
 import java.util.Locale
 
@@ -57,6 +62,7 @@ fun ProfilesScreen(
     var showImportDialog by remember { mutableStateOf(false) }
     var showManualDialog by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf<V2RayProfile?>(null) }
+    var qrShareProfile by remember { mutableStateOf<V2RayProfile?>(null) }
     var importText by remember { mutableStateOf("") }
 
     // Dynamically calculate category list based strictly on the FIRST WORD of profile remarks
@@ -130,14 +136,25 @@ fun ProfilesScreen(
                     color = TextPrimary
                 )
 
-                IconButton(
-                    onClick = { profilesViewModel.testAllPings() },
-                    enabled = !isTestingPing
-                ) {
-                    if (isTestingPing) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = PrimaryNeonCyan)
-                    } else {
-                        Icon(Icons.Default.NetworkCheck, contentDescription = "Ping All", tint = PrimaryNeonCyan)
+                Row {
+                    IconButton(
+                        onClick = {
+                            profilesViewModel.selectFastestProfile()
+                        },
+                        enabled = !isTestingPing
+                    ) {
+                        Icon(Icons.Default.Bolt, contentDescription = "Auto Fastest", tint = PrimaryNeonEmerald)
+                    }
+
+                    IconButton(
+                        onClick = { profilesViewModel.testAllPings() },
+                        enabled = !isTestingPing
+                    ) {
+                        if (isTestingPing) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = PrimaryNeonCyan)
+                        } else {
+                            Icon(Icons.Default.NetworkCheck, contentDescription = "Ping All", tint = PrimaryNeonCyan)
+                        }
                     }
                 }
             }
@@ -214,6 +231,9 @@ fun ProfilesScreen(
                                 editingProfile = profile
                                 showManualDialog = true
                             },
+                            onQrShare = {
+                                qrShareProfile = profile
+                            },
                             onDelete = { profilesViewModel.deleteProfile(profile) }
                         )
                     }
@@ -266,7 +286,7 @@ fun ProfilesScreen(
         )
     }
 
-    // Manual Form Dialog (Creation & Editor with REALITY support)
+    // Manual Form Dialog
     if (showManualDialog) {
         ManualProfileEditorDialog(
             profileToEdit = editingProfile,
@@ -277,6 +297,51 @@ fun ProfilesScreen(
             }
         )
     }
+
+    // QR Code Share Dialog
+    if (qrShareProfile != null) {
+        val uriStr = remember(qrShareProfile) { QrCodeUtils.profileToUri(qrShareProfile!!) }
+        val qrBitmap = remember(uriStr) { QrCodeUtils.generateQrCodeBitmap(uriStr) }
+
+        AlertDialog(
+            onDismissRequest = { qrShareProfile = null },
+            containerColor = CardDark,
+            title = { Text("Share QR Code - ${qrShareProfile?.remark}", color = TextPrimary) },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (qrBitmap != null) {
+                        Image(
+                            bitmap = qrBitmap.asImageBitmap(),
+                            contentDescription = "Profile QR Code",
+                            modifier = Modifier
+                                .size(240.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(2.dp, PrimaryNeonCyan, RoundedCornerShape(12.dp))
+                                .padding(8.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = uriStr,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { qrShareProfile = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryNeonCyan, contentColor = BackgroundDark)
+                ) {
+                    Text("Close")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -284,6 +349,7 @@ fun ProfileCardItem(
     profile: V2RayProfile,
     onSelect: () -> Unit,
     onEdit: () -> Unit,
+    onQrShare: () -> Unit,
     onDelete: () -> Unit
 ) {
     val borderColor = if (profile.isSelected) PrimaryNeonCyan else GlassBorder
@@ -341,7 +407,10 @@ fun ProfileCardItem(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LatencyBadge(pingMs = profile.pingMs)
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(2.dp))
+                IconButton(onClick = onQrShare) {
+                    Icon(Icons.Default.QrCode, contentDescription = "QR Share", tint = PrimaryNeonCyan)
+                }
                 IconButton(onClick = onEdit) {
                     Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary)
                 }

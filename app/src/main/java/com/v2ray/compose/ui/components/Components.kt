@@ -7,12 +7,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -42,35 +40,94 @@ fun LiveSpeedMeter(
     downloadSpeedKbps: Double,
     modifier: Modifier = Modifier
 ) {
+    val downloadHistory = remember { mutableStateListOf<Float>() }
+    val uploadHistory = remember { mutableStateListOf<Float>() }
+
+    LaunchedEffect(downloadSpeedKbps, uploadSpeedKbps) {
+        if (downloadHistory.size > 20) downloadHistory.removeAt(0)
+        if (uploadHistory.size > 20) uploadHistory.removeAt(0)
+        downloadHistory.add(downloadSpeedKbps.toFloat())
+        uploadHistory.add(uploadSpeedKbps.toFloat())
+    }
+
     GlassCard(modifier = modifier) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Download speed
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("DOWNLOAD", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-                Text(
-                    text = String.format("%.1f KB/s", downloadSpeedKbps),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = PrimaryNeonCyan
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Download speed
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("DOWNLOAD", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Text(
+                        text = String.format("%.1f KB/s", downloadSpeedKbps),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = PrimaryNeonCyan
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(30.dp)
+                        .background(GlassBorder)
                 )
+                // Upload speed
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("UPLOAD", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Text(
+                        text = String.format("%.1f KB/s", uploadSpeedKbps),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = PrimaryNeonEmerald
+                    )
+                }
             }
-            Box(
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Real-Time Neon Speed Canvas Graph
+            Canvas(
                 modifier = Modifier
-                    .width(1.dp)
-                    .height(30.dp)
-                    .background(GlassBorder)
-            )
-            // Upload speed
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("UPLOAD", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-                Text(
-                    text = String.format("%.1f KB/s", uploadSpeedKbps),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = PrimaryNeonEmerald
-                )
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(BackgroundDark.copy(alpha = 0.5f))
+            ) {
+                val w = size.width
+                val h = size.height
+
+                val maxDl = (downloadHistory.maxOrNull() ?: 100f).coerceAtLeast(10f)
+                val maxUl = (uploadHistory.maxOrNull() ?: 100f).coerceAtLeast(10f)
+
+                if (downloadHistory.size > 1) {
+                    val dlPath = Path()
+                    val step = w / (downloadHistory.size - 1)
+                    downloadHistory.forEachIndexed { i, speed ->
+                        val x = i * step
+                        val y = h - (speed / maxDl * (h * 0.8f)) - (h * 0.1f)
+                        if (i == 0) dlPath.moveTo(x, y) else dlPath.lineTo(x, y)
+                    }
+                    drawPath(
+                        path = dlPath,
+                        color = PrimaryNeonCyan,
+                        style = Stroke(width = 3f)
+                    )
+                }
+
+                if (uploadHistory.size > 1) {
+                    val ulPath = Path()
+                    val step = w / (uploadHistory.size - 1)
+                    uploadHistory.forEachIndexed { i, speed ->
+                        val x = i * step
+                        val y = h - (speed / maxUl * (h * 0.8f)) - (h * 0.1f)
+                        if (i == 0) ulPath.moveTo(x, y) else ulPath.lineTo(x, y)
+                    }
+                    drawPath(
+                        path = ulPath,
+                        color = PrimaryNeonEmerald,
+                        style = Stroke(width = 3f)
+                    )
+                }
             }
         }
     }

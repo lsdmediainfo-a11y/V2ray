@@ -1,6 +1,7 @@
 package com.v2ray.compose.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.content.pm.PackageManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,11 +14,22 @@ import kotlinx.coroutines.launch
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val prefs = application.getSharedPreferences("v2ray_settings", Context.MODE_PRIVATE)
+
     private val _installedApps = MutableStateFlow<List<AppInfo>>(emptyList())
     val installedApps: StateFlow<List<AppInfo>> = _installedApps.asStateFlow()
 
     private val _bypassedPackages = MutableStateFlow<Set<String>>(emptySet())
     val bypassedPackages: StateFlow<Set<String>> = _bypassedPackages.asStateFlow()
+
+    private val _autoConnect = MutableStateFlow(prefs.getBoolean("auto_connect", false))
+    val autoConnect: StateFlow<Boolean> = _autoConnect.asStateFlow()
+
+    private val _killSwitch = MutableStateFlow(prefs.getBoolean("kill_switch", false))
+    val killSwitch: StateFlow<Boolean> = _killSwitch.asStateFlow()
+
+    private val _bypassLan = MutableStateFlow(prefs.getBoolean("bypass_lan", true))
+    val bypassLan: StateFlow<Boolean> = _bypassLan.asStateFlow()
 
     init {
         loadInstalledApps()
@@ -47,5 +59,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             current.add(packageName)
         }
         _bypassedPackages.value = current
+    }
+
+    fun setAutoConnect(value: Boolean) {
+        _autoConnect.value = value
+        prefs.edit().putBoolean("auto_connect", value).apply()
+    }
+
+    fun setKillSwitch(value: Boolean) {
+        _killSwitch.value = value
+        prefs.edit().putBoolean("kill_switch", value).apply()
+    }
+
+    fun setBypassLan(value: Boolean) {
+        _bypassLan.value = value
+        prefs.edit().putBoolean("bypass_lan", value).apply()
     }
 }
