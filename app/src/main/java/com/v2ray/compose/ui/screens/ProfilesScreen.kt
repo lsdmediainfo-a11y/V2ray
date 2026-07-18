@@ -338,3 +338,175 @@ fun ProfileCardItem(
         }
     }
 }
+
+@Composable
+fun ManualProfileEditorDialog(
+    profileToEdit: V2RayProfile?,
+    onDismiss: () -> Unit,
+    onSave: (V2RayProfile) -> Unit
+) {
+    var remark by remember { mutableStateOf(profileToEdit?.remark ?: "Custom Server") }
+    var protocol by remember { mutableStateOf(profileToEdit?.protocol ?: ProtocolType.VLESS) }
+    var address by remember { mutableStateOf(profileToEdit?.address ?: "") }
+    var port by remember { mutableStateOf(profileToEdit?.port?.toString() ?: "443") }
+    var uuidOrPassword by remember { mutableStateOf(profileToEdit?.uuidOrPassword ?: "") }
+    var sni by remember { mutableStateOf(profileToEdit?.sni ?: "") }
+    var network by remember { mutableStateOf(profileToEdit?.network ?: "tcp") }
+    var isTls by remember { mutableStateOf(profileToEdit?.isTls ?: true) }
+    var isReality by remember { mutableStateOf(profileToEdit?.isReality ?: false) }
+    var publicKey by remember { mutableStateOf(profileToEdit?.publicKey ?: "") }
+    var shortId by remember { mutableStateOf(profileToEdit?.shortId ?: "") }
+    var fingerprint by remember { mutableStateOf(profileToEdit?.fingerprint ?: "chrome") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardDark,
+        title = { Text(if (profileToEdit != null) "Edit Profile" else "Manual Configuration Entry", color = TextPrimary) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = remark,
+                    onValueChange = { remark = it },
+                    label = { Text("Profile Remark / Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Protocol:", color = TextSecondary)
+                    Row {
+                        ProtocolType.entries.take(4).forEach { p ->
+                            FilterChip(
+                                selected = protocol == p,
+                                onClick = { protocol = p },
+                                label = { Text(p.displayName) },
+                                modifier = Modifier.padding(horizontal = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = address,
+                        onValueChange = { address = it },
+                        label = { Text("Address / IP") },
+                        modifier = Modifier.weight(2f)
+                    )
+                    OutlinedTextField(
+                        value = port,
+                        onValueChange = { port = it },
+                        label = { Text("Port") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                OutlinedTextField(
+                    value = uuidOrPassword,
+                    onValueChange = { uuidOrPassword = it },
+                    label = { Text("UUID / Password") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = sni,
+                    onValueChange = { sni = it },
+                    label = { Text("SNI (Server Name Indication)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Security (TLS / REALITY):", color = TextSecondary)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("TLS", color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
+                        Switch(
+                            checked = isTls,
+                            onCheckedChange = {
+                                isTls = it
+                                if (!it) isReality = false
+                            }
+                        )
+                    }
+                }
+
+                if (isTls && protocol == ProtocolType.VLESS) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Enable REALITY Security", color = PrimaryNeonEmerald)
+                        Switch(
+                            checked = isReality,
+                            onCheckedChange = { isReality = it }
+                        )
+                    }
+
+                    if (isReality) {
+                        OutlinedTextField(
+                            value = publicKey,
+                            onValueChange = { publicKey = it },
+                            label = { Text("REALITY Public Key (pbk)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = shortId,
+                            onValueChange = { shortId = it },
+                            label = { Text("REALITY Short ID (sid)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = fingerprint,
+                            onValueChange = { fingerprint = it },
+                            label = { Text("Fingerprint (e.g. chrome, firefox)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val newProfile = V2RayProfile(
+                        id = profileToEdit?.id ?: java.util.UUID.randomUUID().toString(),
+                        remark = remark,
+                        address = address,
+                        port = port.toIntOrNull() ?: 443,
+                        protocol = protocol,
+                        uuidOrPassword = uuidOrPassword,
+                        sni = sni,
+                        network = network,
+                        isTls = isTls,
+                        isReality = isReality,
+                        publicKey = publicKey,
+                        shortId = shortId,
+                        fingerprint = fingerprint,
+                        isSelected = profileToEdit?.isSelected ?: false
+                    )
+                    onSave(newProfile)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryNeonCyan, contentColor = BackgroundDark)
+            ) {
+                Text("Save Profile")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextSecondary)
+            }
+        }
+    )
+}
