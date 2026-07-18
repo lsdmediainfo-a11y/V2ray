@@ -3,6 +3,7 @@ package com.v2ray.compose.parser
 import android.util.Base64
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.google.gson.JsonPrimitive
 import com.v2ray.compose.model.ProtocolType
 import com.v2ray.compose.model.V2RayProfile
 import java.net.URLDecoder
@@ -224,9 +225,9 @@ object V2RayUriParser {
         // Custom DoH / DNS Configuration
         val dns = JsonObject().apply {
             val servers = com.google.gson.JsonArray().apply {
-                add(dnsServer)
-                add("https://dns.adguard-dns.com/dns-query")
-                add("8.8.8.8")
+                add(JsonPrimitive(dnsServer))
+                add(JsonPrimitive("https://dns.adguard-dns.com/dns-query"))
+                add(JsonPrimitive("8.8.8.8"))
             }
             add("servers", servers)
         }
@@ -361,11 +362,11 @@ object V2RayUriParser {
                     val adRule = JsonObject().apply {
                         addProperty("type", "field")
                         val domains = com.google.gson.JsonArray().apply {
-                            add("geosite:category-ads-all")
-                            add("domain:doubleclick.net")
-                            add("domain:adservice.google.com")
+                            add(JsonPrimitive("geosite:category-ads-all"))
+                            add(JsonPrimitive("domain:doubleclick.net"))
+                            add(JsonPrimitive("domain:adservice.google.com"))
                         }
-                        add("outboundTag", "block")
+                        addProperty("outboundTag", "block")
                         add("domain", domains)
                     }
                     add(adRule)

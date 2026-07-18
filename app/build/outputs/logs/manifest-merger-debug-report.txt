@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:2:1-42:12
-INJECTED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:2:1-42:12
-INJECTED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:2:1-42:12
-INJECTED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:2:1-42:12
+ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:2:1-53:12
+INJECTED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:2:1-53:12
+INJECTED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:2:1-53:12
+INJECTED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:2:1-53:12
 MERGED from [androidx.navigation:navigation-common:2.7.7] /root/.gradle/caches/transforms-3/29a18bc11b3a71c83e42a58b09494b4a/transformed/navigation-common-2.7.7/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-runtime:2.7.7] /root/.gradle/caches/transforms-3/3ba8f2f3798e432995fe693682bf4932/transformed/navigation-runtime-2.7.7/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-common-ktx:2.7.7] /root/.gradle/caches/transforms-3/247ceecac061c2010b44ba27512a1d27/transformed/navigation-common-ktx-2.7.7/AndroidManifest.xml:2:1-7:12
@@ -96,8 +96,8 @@ ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:10:5-81
 	android:name
 		ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:10:22-78
 application
-ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:12:5-40:19
-INJECTED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:12:5-40:19
+ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:12:5-51:19
+INJECTED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:12:5-51:19
 MERGED from [androidx.compose.ui:ui-test-manifest:1.6.1] /root/.gradle/caches/transforms-3/db0648bdd7fd4edbed4d0cf9c78b5c78/transformed/ui-test-manifest-1.6.1/AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.compose.ui:ui-test-manifest:1.6.1] /root/.gradle/caches/transforms-3/db0648bdd7fd4edbed4d0cf9c78b5c78/transformed/ui-test-manifest-1.6.1/AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.compose.ui:ui-tooling-android:1.6.1] /root/.gradle/caches/transforms-3/a7637346255fd9385bacc5e4ce30185e/transformed/ui-tooling-release/AndroidManifest.xml:22:5-26:19
@@ -166,6 +166,24 @@ action#android.net.VpnService
 ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:36:17-65
 	android:name
 		ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:36:25-62
+service#com.v2ray.compose.service.V2RayTileService
+ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:40:9-49:19
+	android:label
+		ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:44:13-38
+	android:exported
+		ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:42:13-36
+	android:permission
+		ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:45:13-77
+	android:icon
+		ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:43:13-47
+	android:name
+		ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:41:13-53
+intent-filter#action:name:android.service.quicksettings.action.QS_TILE
+ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:46:13-48:29
+action#android.service.quicksettings.action.QS_TILE
+ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:47:17-87
+	android:name
+		ADDED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml:47:25-84
 uses-sdk
 INJECTED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /root/v2ray-compose-app/app/src/main/AndroidManifest.xml

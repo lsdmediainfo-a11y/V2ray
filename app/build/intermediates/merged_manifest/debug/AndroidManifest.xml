@@ -52,6 +52,16 @@
                 <action android:name="android.net.VpnService" />
             </intent-filter>
         </service>
+        <service
+            android:name="com.v2ray.compose.service.V2RayTileService"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="V2Ray VPN"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" >
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <activity
             android:name="androidx.activity.ComponentActivity"
