@@ -47,15 +47,28 @@ object SubscriptionParser {
     }
 
     private fun decodeSubscriptionContent(content: String): String {
-        return try {
-            var cleaned = content.replace("\n", "").replace("\r", "").replace(" ", "").trim()
-            while (cleaned.length % 4 != 0) {
-                cleaned += "="
-            }
-            val bytes = Base64.decode(cleaned, Base64.DEFAULT or Base64.NO_WRAP or Base64.URL_SAFE)
-            String(bytes, StandardCharsets.UTF_8)
+        val cleaned = content.replace("\n", "").replace("\r", "").replace(" ", "").trim()
+        val padded = if (cleaned.length % 4 != 0) cleaned + "=".repeat(4 - (cleaned.length % 4)) else cleaned
+
+        // Stage 1: Try standard Base64 NO_WRAP
+        try {
+            val bytes = Base64.decode(padded, Base64.NO_WRAP)
+            val text = String(bytes, StandardCharsets.UTF_8)
+            if (text.contains("://")) return text
         } catch (e: Exception) {
-            content
+            e.printStackTrace()
         }
+
+        // Stage 2: Try URL-safe Base64 substitution (- -> +, _ -> /)
+        try {
+            val alt = padded.replace("-", "+").replace("_", "/")
+            val bytes = Base64.decode(alt, Base64.NO_WRAP)
+            val text = String(bytes, StandardCharsets.UTF_8)
+            if (text.contains("://")) return text
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return content
     }
 }
