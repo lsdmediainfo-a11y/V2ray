@@ -146,7 +146,17 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 
 export function ServersScreen() {
   const navigation = useNavigation<any>();
-  const { configs, activeConfigId, setActiveConfig, deleteConfig, pingConfig, importFromClipboard } = useConfigStore();
+  const {
+    configs,
+    activeConfigId,
+    setActiveConfig,
+    deleteConfig,
+    pingConfig,
+    pingAllConfigs,
+    selectFastestConfig,
+    isPingingAll,
+    importFromClipboard,
+  } = useConfigStore();
   const [refreshing, setRefreshing] = useState(false);
   const [pingingId, setPingingId] = useState<string | null>(null);
 
@@ -177,8 +187,17 @@ export function ServersScreen() {
 
   const handlePingAll = async () => {
     setRefreshing(true);
-    await Promise.all(configs.map(c => pingConfig(c.id)));
+    await pingAllConfigs();
     setRefreshing(false);
+  };
+
+  const handleSelectFastest = async () => {
+    setRefreshing(true);
+    const fastestId = await selectFastestConfig();
+    setRefreshing(false);
+    if (!fastestId) {
+      Alert.alert('Bilgi', 'Ping atılabilen uygun sunucu bulunamadı.');
+    }
   };
 
   const handleImportClipboard = async () => {
@@ -208,10 +227,10 @@ export function ServersScreen() {
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.actionPill}
-            onPress={handleImportClipboard}
+            onPress={handleSelectFastest}
           >
-            <Ionicons name="clipboard-outline" size={16} color={Colors.secondary} />
-            <Text style={[styles.actionPillText, { color: Colors.secondary }]}>Panodan İçe Aktar</Text>
+            <Ionicons name="flash-outline" size={16} color={Colors.primary} />
+            <Text style={[styles.actionPillText, { color: Colors.primary }]}>En Hızlıyı Seç</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -219,7 +238,15 @@ export function ServersScreen() {
             onPress={handlePingAll}
           >
             <Ionicons name="speedometer-outline" size={16} color={Colors.warning} />
-            <Text style={[styles.actionPillText, { color: Colors.warning }]}>Hepsini Ping At</Text>
+            <Text style={[styles.actionPillText, { color: Colors.warning }]}>Ping At</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionPill}
+            onPress={handleImportClipboard}
+          >
+            <Ionicons name="clipboard-outline" size={16} color={Colors.secondary} />
+            <Text style={[styles.actionPillText, { color: Colors.secondary }]}>Panodan İçe Aktar</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

@@ -62,7 +62,7 @@ function SettingsRow({
 }
 
 export function SettingsScreen() {
-  const { configs, clearLogs } = useConfigStore();
+  const { configs, clearLogs, routingConfig, updateRoutingConfig } = useConfigStore();
 
   const [autoConnect, setAutoConnect] = useState(false);
   const [killSwitch, setKillSwitch] = useState(false);
@@ -146,7 +146,35 @@ export function SettingsScreen() {
             />
           </SettingsSection>
 
-          <SettingsSection title="Ağ">
+          <SettingsSection title="Ağ & Tünelleme">
+            <SettingsRow
+              icon="git-network-outline"
+              iconColor={Colors.primary}
+              label="LAN'ı Bypass Et"
+              sublabel="Yerel ağ (192.168.x.x vb.) doğrudan bağlansın"
+              right={
+                <Switch
+                  value={routingConfig.bypassLan}
+                  onValueChange={(val) => updateRoutingConfig({ bypassLan: val })}
+                  trackColor={{ false: Colors.border, true: Colors.primary + '80' }}
+                  thumbColor={routingConfig.bypassLan ? Colors.primary : Colors.textMuted}
+                />
+              }
+            />
+            <SettingsRow
+              icon="flag-outline"
+              iconColor={Colors.secondary}
+              label="Yerel Siteleri Bypass Et"
+              sublabel="Ülke içi siteler tünel dışı kalsın"
+              right={
+                <Switch
+                  value={routingConfig.bypassDomestic}
+                  onValueChange={(val) => updateRoutingConfig({ bypassDomestic: val })}
+                  trackColor={{ false: Colors.border, true: Colors.secondary + '80' }}
+                  thumbColor={routingConfig.bypassDomestic ? Colors.secondary : Colors.textMuted}
+                />
+              }
+            />
             <SettingsRow
               icon="globe-outline"
               iconColor={Colors.secondary}
@@ -174,27 +202,6 @@ export function SettingsScreen() {
                   thumbColor={udpEnabled ? Colors.accent : Colors.textMuted}
                 />
               }
-            />
-            <SettingsRow
-              icon="git-merge-outline"
-              iconColor={Colors.vmess}
-              label="Mux (Çoğullama)"
-              sublabel="Tek bağlantıda çoklu akış"
-              right={
-                <Switch
-                  value={muxEnabled}
-                  onValueChange={setMuxEnabled}
-                  trackColor={{ false: Colors.border, true: Colors.vmess + '80' }}
-                  thumbColor={muxEnabled ? Colors.vmess : Colors.textMuted}
-                />
-              }
-            />
-            <SettingsRow
-              icon="server-outline"
-              iconColor={Colors.textSecondary}
-              label="DNS Sunucusu"
-              sublabel={dns}
-              onPress={() => Alert.alert('DNS', 'DNS ayarı yakında')}
               separator={false}
             />
           </SettingsSection>

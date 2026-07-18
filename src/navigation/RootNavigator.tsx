@@ -3,17 +3,19 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius, Shadow } from '../utils/theme';
 
 // Screens
 import { HomeScreen } from '../screens/HomeScreen';
 import { ServersScreen } from '../screens/ServersScreen';
+import { SubscriptionsScreen } from '../screens/SubscriptionsScreen';
 import { AddServerScreen } from '../screens/AddServerScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { LogsScreen } from '../screens/LogsScreen';
 import { ServerDetailScreen } from '../screens/ServerDetailScreen';
+import { QRScannerScreen } from '../screens/QRScannerScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -59,6 +61,16 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
+        name="Subscriptions"
+        component={SubscriptionsScreen}
+        options={{
+          tabBarLabel: 'Abonelikler',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name={focused ? 'link' : 'link-outline'} focused={focused} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Logs"
         component={LogsScreen}
         options={{
@@ -97,6 +109,13 @@ export function RootNavigator() {
         options={{
           presentation: 'modal',
           cardStyle: { backgroundColor: Colors.bgModal },
+        }}
+      />
+      <Stack.Screen
+        name="QRScanner"
+        component={QRScannerScreen}
+        options={{
+          presentation: 'modal',
         }}
       />
       <Stack.Screen

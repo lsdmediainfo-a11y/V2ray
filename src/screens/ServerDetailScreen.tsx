@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   Share,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -372,5 +373,3 @@ const styles = StyleSheet.create({
   },
 });
 
-// Platform import missing fix
-const { Platform } = require('react-native');

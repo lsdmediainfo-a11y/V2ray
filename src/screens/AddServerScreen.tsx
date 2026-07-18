@@ -370,6 +370,16 @@ export function AddServerScreen() {
                     </View>
                   </View>
 
+                  <TouchableOpacity
+                    style={[styles.submitBtn, { marginBottom: Spacing.sm }]}
+                    onPress={() => navigation.navigate('QRScanner')}
+                  >
+                    <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.submitGrad}>
+                      <Ionicons name="camera-outline" size={20} color="#fff" />
+                      <Text style={styles.submitText}>Kamera ile QR Tara</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
                   <TouchableOpacity style={styles.submitBtn} onPress={handleUriImport}>
                     <LinearGradient colors={[Colors.secondary, Colors.secondaryDark]} style={styles.submitGrad}>
                       <Ionicons name="download-outline" size={20} color="#fff" />
