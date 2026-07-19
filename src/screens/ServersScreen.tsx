@@ -1,7 +1,7 @@
 // src/screens/ServersScreen.tsx
-// Sunucu listesi, seçim, silme, ping ölçümü
+// Sunucu listesi, filtreleme, ülke bayrakları, ping ve sıralama
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,14 @@ import {
   Alert,
   Animated,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'react-native-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
-import { useConfigStore, V2RayConfig } from '../store/configStore';
+import { useConfigStore, V2RayConfig, Protocol } from '../store/configStore';
 import {
   Colors,
   Spacing,
@@ -29,7 +30,7 @@ import {
 
 function PingBadge({ ping }: { ping?: number }) {
   if (ping === undefined) return <Text style={styles.pingNone}>—</Text>;
-  const color = ping < 100 ? Colors.success : ping < 300 ? Colors.warning : Colors.error;
+  const color = ping < 120 ? Colors.success : ping < 300 ? Colors.warning : Colors.error;
   return <Text style={[styles.pingText, { color }]}>{ping}ms</Text>;
 }
 
@@ -48,7 +49,7 @@ function ServerCard({
   onPing: () => void;
   onDetail: () => void;
 }) {
-  const protocolColor = getProtocolColor(config.protocol);
+  const protocolColor = config.protocol === 'hysteria2' ? '#EC4899' : getProtocolColor(config.protocol);
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true, speed: 20 }).start();
@@ -74,24 +75,22 @@ function ServerCard({
         )}
 
         <View style={styles.cardLeft}>
-          {/* Protocol circle */}
-          <View style={[styles.protocolCircle, { backgroundColor: protocolColor + '20', borderColor: protocolColor + '50' }]}>
-            <Text style={[styles.protocolLetter, { color: protocolColor }]}>
-              {config.protocol[0].toUpperCase()}
-            </Text>
-          </View>
+          <Text style={styles.flagIcon}>{config.flag || '🌐'}</Text>
 
           <View style={styles.cardInfo}>
-            <Text style={styles.cardName} numberOfLines={1}>{config.name}</Text>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.cardName} numberOfLines={1}>{config.name}</Text>
+              {config.country && <Text style={styles.countryLabel}>{config.country}</Text>}
+            </View>
             <Text style={styles.cardAddress} numberOfLines={1}>
               {config.address}:{config.port}
             </Text>
             <View style={styles.cardMeta}>
               <View style={[styles.tag, { backgroundColor: protocolColor + '20' }]}>
-                <Text style={[styles.tagText, { color: protocolColor }]}>{config.protocol}</Text>
+                <Text style={[styles.tagText, { color: protocolColor }]}>{config.protocol.toUpperCase()}</Text>
               </View>
               <View style={[styles.tag, { backgroundColor: Colors.bgInput }]}>
-                <Text style={styles.tagText}>{config.network}</Text>
+                <Text style={styles.tagText}>{config.network.toUpperCase()}</Text>
               </View>
               {config.security !== 'none' && (
                 <View style={[styles.tag, { backgroundColor: Colors.success + '20' }]}>
@@ -154,11 +153,19 @@ export function ServersScreen() {
     pingConfig,
     pingAllConfigs,
     selectFastestConfig,
-    isPingingAll,
     importFromClipboard,
   } = useConfigStore();
+
   const [refreshing, setRefreshing] = useState(false);
-  const [pingingId, setPingingId] = useState<string | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState<string>('all');
+
+  const filteredConfigs = useMemo(() => {
+    if (selectedFilter === 'all') return configs;
+    if (selectedFilter === 'fastest') {
+      return [...configs].sort((a, b) => (a.ping || 999) - (b.ping || 999));
+    }
+    return configs.filter(c => c.protocol === selectedFilter);
+  }, [configs, selectedFilter]);
 
   const handleSelect = useCallback((id: string) => {
     setActiveConfig(id);
@@ -180,9 +187,7 @@ export function ServersScreen() {
   }, []);
 
   const handlePing = useCallback(async (id: string) => {
-    setPingingId(id);
     await pingConfig(id);
-    setPingingId(null);
   }, []);
 
   const handlePingAll = async () => {
@@ -208,11 +213,21 @@ export function ServersScreen() {
     }
     const ok = await importFromClipboard(text);
     if (ok) {
-      Alert.alert('Başarılı', 'Sunucu(lar) içe aktarıldı!');
+      Alert.alert('Başarılı', 'Sunucu(lar) başarıyla içe aktarıldı!');
     } else {
-      Alert.alert('Hata', 'Geçerli URI bulunamadı.\nvmess://, vless://, trojan://, ss:// desteklenir.');
+      Alert.alert('Hata', 'Geçerli URI bulunamadı.\nvmess://, vless://, trojan://, ss://, hysteria2:// desteklenir.');
     }
   };
+
+  const filterChips = [
+    { id: 'all', label: 'Tümü' },
+    { id: 'fastest', label: '⚡ En Hızlı' },
+    { id: 'vmess', label: 'VMess' },
+    { id: 'vless', label: 'VLess' },
+    { id: 'trojan', label: 'Trojan' },
+    { id: 'shadowsocks', label: 'Shadowsocks' },
+    { id: 'hysteria2', label: 'Hysteria2' },
+  ];
 
   return (
     <View style={styles.root}>
@@ -220,7 +235,7 @@ export function ServersScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Sunucular</Text>
-          <Text style={styles.subtitle}>{configs.length} sunucu</Text>
+          <Text style={styles.subtitle}>{configs.length} sunucu kayıtlı</Text>
         </View>
 
         {/* Actions */}
@@ -259,12 +274,36 @@ export function ServersScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Filter Chips Bar */}
+        {configs.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScroll}
+          >
+            {filterChips.map(chip => {
+              const active = selectedFilter === chip.id;
+              return (
+                <TouchableOpacity
+                  key={chip.id}
+                  style={[styles.filterChip, active && styles.filterChipActive]}
+                  onPress={() => setSelectedFilter(chip.id)}
+                >
+                  <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                    {chip.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+
         {/* List */}
         {configs.length === 0 ? (
           <EmptyState onAdd={() => navigation.navigate('AddServer')} />
         ) : (
           <FlatList
-            data={configs}
+            data={filteredConfigs}
             keyExtractor={item => item.id}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
@@ -304,7 +343,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.xs,
     gap: Spacing.sm,
     flexWrap: 'wrap',
   },
@@ -330,6 +369,27 @@ const styles = StyleSheet.create({
     ...Shadow.card,
   },
 
+  filterScroll: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  filterChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.bgCard,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.primary + '25',
+    borderColor: Colors.primary,
+  },
+  filterChipText: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
+  filterChipTextActive: { color: Colors.primaryLight, fontWeight: '700' },
+
   list: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.xxl },
 
   cardWrapper: { marginBottom: Spacing.sm },
@@ -346,18 +406,11 @@ const styles = StyleSheet.create({
   },
   cardActive: { borderColor: Colors.primary + '80' },
   cardLeft: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  protocolCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    marginRight: Spacing.sm,
-  },
-  protocolLetter: { fontSize: 18, fontWeight: '800' },
+  flagIcon: { fontSize: 28, marginRight: Spacing.xs },
   cardInfo: { flex: 1 },
-  cardName: { ...Typography.body, fontWeight: '700', marginBottom: 2 },
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardName: { ...Typography.body, fontWeight: '700', marginBottom: 2, flexShrink: 1 },
+  countryLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '500' },
   cardAddress: { ...Typography.bodySmall, marginBottom: 6 },
   cardMeta: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   tag: {

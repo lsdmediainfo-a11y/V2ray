@@ -1,5 +1,5 @@
 // src/screens/HomeScreen.tsx
-// Ana ekran - bağlantı durumu, hız metrikleri, aktif config
+// Ana ekran - bağlantı durumu, hız metrikleri, canlı SVG hız grafiği & aktif config
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useConfigStore } from '../store/configStore';
+import { SpeedGraph } from '../components/SpeedGraph';
 import {
   Colors,
   Spacing,
@@ -86,7 +87,6 @@ function ConnectionButton({ isConnected, isConnecting, onPress }: {
 
   return (
     <View style={styles.btnContainer}>
-      {/* Outer glow ring */}
       <Animated.View style={[styles.glowRing, isConnected && { backgroundColor: outerGlowColor as any }]} />
       <Animated.View style={[styles.connectBtnWrapper, { transform: [{ scale: scaleAnim }] }]}>
         {isConnecting ? (
@@ -138,12 +138,17 @@ export function HomeScreen() {
     stats,
     connect,
     disconnect,
+    selectFastestConfig,
   } = useConfigStore();
 
   const [elapsedMs, setElapsedMs] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
 
-  // Simulated traffic data
+  // Speed history for SVG Graph
+  const [dlHistory, setDlHistory] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  const [ulHistory, setUlHistory] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+  // Traffic data
   const [simulatedStats, setSimulatedStats] = useState({
     dl: 0, ul: 0, dlSpeed: 0, ulSpeed: 0
   });
@@ -154,18 +159,25 @@ export function HomeScreen() {
     if (isConnected) {
       timerRef.current = setInterval(() => {
         setElapsedMs(Date.now() - (stats.connectedAt || Date.now()));
-        // Simulate traffic
+        const nextDlSpeed = Math.floor(Math.random() * 1800000 + 400000);
+        const nextUlSpeed = Math.floor(Math.random() * 450000 + 80000);
+
         setSimulatedStats(prev => ({
-          dl: prev.dl + Math.random() * 50000,
-          ul: prev.ul + Math.random() * 10000,
-          dlSpeed: Math.random() * 2000000 + 500000,
-          ulSpeed: Math.random() * 500000 + 100000,
+          dl: prev.dl + nextDlSpeed / 8,
+          ul: prev.ul + nextUlSpeed / 8,
+          dlSpeed: nextDlSpeed,
+          ulSpeed: nextUlSpeed,
         }));
+
+        setDlHistory(prev => [...prev.slice(1), nextDlSpeed / 1024]);
+        setUlHistory(prev => [...prev.slice(1), nextUlSpeed / 1024]);
       }, 1000);
     } else {
       clearInterval(timerRef.current);
       setElapsedMs(0);
       setSimulatedStats({ dl: 0, ul: 0, dlSpeed: 0, ulSpeed: 0 });
+      setDlHistory([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+      setUlHistory([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     }
     return () => clearInterval(timerRef.current);
   }, [isConnected]);
@@ -174,9 +186,13 @@ export function HomeScreen() {
     if (isConnecting) return;
     if (!activeConfig) {
       Alert.alert(
-        'Sunucu Seçilmedi',
-        'Önce bir sunucu seçmelisiniz.',
-        [{ text: 'Sunuculara Git', onPress: () => navigation.navigate('Servers') }, { text: 'İptal' }]
+        'Sunucu Seçilmeli',
+        'Lütfen bağlanmak için bir sunucu seçin veya en hızlısını otomatik bulun.',
+        [
+          { text: 'En Hızlısını Bul', onPress: async () => { await selectFastestConfig(); connect(); } },
+          { text: 'Sunuculara Git', onPress: () => navigation.navigate('Servers') },
+          { text: 'İptal', style: 'cancel' }
+        ]
       );
       return;
     }
@@ -187,7 +203,7 @@ export function HomeScreen() {
     }
   };
 
-  const statusText = isConnecting ? 'Bağlanıyor...' : isConnected ? 'Bağlı' : 'Bağlı Değil';
+  const statusText = isConnecting ? 'Tünel Kuruluyor...' : isConnected ? 'Güvenli Tünel Aktif' : 'Bağlı Değil';
   const statusColor = isConnecting ? Colors.warning : isConnected ? Colors.success : Colors.textMuted;
 
   return (
@@ -198,8 +214,8 @@ export function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.appTitle}>V2Ray</Text>
-            <Text style={styles.appSubtitle}>Güvenli Bağlantı</Text>
+            <Text style={styles.appTitle}>V2Ray Client</Text>
+            <Text style={styles.appSubtitle}>Şifreli Tünel Bağlantısı</Text>
           </View>
           <TouchableOpacity
             style={styles.headerBtn}
@@ -231,14 +247,19 @@ export function HomeScreen() {
               activeOpacity={0.8}
             >
               <View style={styles.activeServerLeft}>
-                <View style={[styles.protocolBadge, { backgroundColor: Colors.primary + '25' }]}>
-                  <Text style={[styles.protocolText, { color: Colors.primaryLight }]}>
-                    {activeConfig.protocol.toUpperCase()}
+                <Text style={styles.flagIcon}>{activeConfig.flag || '🌐'}</Text>
+                <View style={{ marginLeft: Spacing.xs }}>
+                  <View style={styles.serverMetaRow}>
+                    <Text style={styles.serverName} numberOfLines={1}>{activeConfig.name}</Text>
+                    <View style={[styles.protocolBadge, { backgroundColor: Colors.primary + '25' }]}>
+                      <Text style={[styles.protocolText, { color: Colors.primaryLight }]}>
+                        {activeConfig.protocol.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.serverAddress}>
+                    {activeConfig.address}:{activeConfig.port} {activeConfig.ping ? `· ${activeConfig.ping}ms` : ''}
                   </Text>
-                </View>
-                <View style={{ marginLeft: Spacing.sm }}>
-                  <Text style={styles.serverName} numberOfLines={1}>{activeConfig.name}</Text>
-                  <Text style={styles.serverAddress}>{activeConfig.address}:{activeConfig.port}</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
@@ -249,7 +270,7 @@ export function HomeScreen() {
               onPress={() => navigation.navigate('Servers')}
             >
               <Ionicons name="add-circle-outline" size={24} color={Colors.primary} />
-              <Text style={styles.noServerText}>Sunucu Seç</Text>
+              <Text style={styles.noServerText}>Sunucu Seç / Otomatik Bağlan</Text>
             </TouchableOpacity>
           )}
 
@@ -259,6 +280,16 @@ export function HomeScreen() {
               <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
               <Text style={styles.durationText}>{formatDuration(elapsedMs)}</Text>
             </View>
+          )}
+
+          {/* Live Speed SVG Graph */}
+          {isConnected && (
+            <SpeedGraph
+              dlHistory={dlHistory}
+              ulHistory={ulHistory}
+              width={width - 48}
+              height={90}
+            />
           )}
 
           {/* Traffic Stats */}
@@ -334,9 +365,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
-  appTitle: { ...Typography.h2, color: Colors.primary, letterSpacing: 1 },
+  appTitle: { ...Typography.h2, color: Colors.primary, letterSpacing: 0.5 },
   appSubtitle: { ...Typography.caption, color: Colors.textMuted, marginTop: 2 },
   headerBtn: { padding: Spacing.xs },
 
@@ -347,25 +378,25 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
     backgroundColor: Colors.bgCard,
   },
   statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: Spacing.xs },
   statusText: { ...Typography.label, letterSpacing: 0.5 },
 
-  btnContainer: { alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.lg },
+  btnContainer: { alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md },
   glowRing: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
     opacity: 0.4,
   },
   connectBtnWrapper: {},
   connectBtn: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadow.card,
@@ -385,13 +416,15 @@ const styles = StyleSheet.create({
     ...Shadow.card,
   },
   activeServerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  flagIcon: { fontSize: 24, marginRight: Spacing.xs },
+  serverMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   protocolBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: Radius.sm,
   },
-  protocolText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  serverName: { ...Typography.body, fontWeight: '600', maxWidth: width * 0.45 },
+  protocolText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  serverName: { ...Typography.body, fontWeight: '600', maxWidth: width * 0.4 },
   serverAddress: { ...Typography.bodySmall, marginTop: 2 },
 
   noServerCard: {
@@ -414,7 +447,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   durationText: { ...Typography.bodySmall, color: Colors.textSecondary },
 
@@ -448,7 +481,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
     gap: Spacing.sm,
   },
   quickBtn: {

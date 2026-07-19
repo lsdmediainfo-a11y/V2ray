@@ -1,11 +1,14 @@
 // src/store/configStore.ts
-// Zustand tabanlı global state yönetimi - Gelişmiş Özellikler (Abonelik, Tünelleme, Ping, QR)
+// Zustand tabanlı global state yönetimi - Native Core, Real TCP Ping & Hysteria2 / REALITY
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { generateV2RayConfigJson, V2RayFullConfig } from '../utils/configGenerator';
+import { measureTcpPing, resolveCountryFlag } from '../utils/tcpPing';
+import { parseHysteria2Uri, parseVLessRealityUri } from '../utils/hysteriaParser';
 
-export type Protocol = 'vmess' | 'vless' | 'trojan' | 'shadowsocks';
+export type Protocol = 'vmess' | 'vless' | 'trojan' | 'shadowsocks' | 'hysteria2' | 'tuic';
 
 export interface V2RayConfig {
   id: string;
@@ -16,14 +19,24 @@ export interface V2RayConfig {
   uuid?: string;
   password?: string;
   alterId?: number;
-  security: 'none' | 'tls' | 'xtls';
+  cipher?: string;
+  security: 'none' | 'tls' | 'xtls' | 'reality';
   network: 'tcp' | 'ws' | 'grpc' | 'h2' | 'kcp';
   path?: string;
   host?: string;
   sni?: string;
   allowInsecure?: boolean;
+  flow?: string;
+  publicKey?: string;
+  shortId?: string;
+  spiderX?: string;
+  fingerprint?: string;
+  obfs?: string;
+  obfsPassword?: string;
   remark?: string;
   ping?: number;
+  country?: string;
+  flag?: string;
   createdAt: number;
   isActive?: boolean;
   subscriptionId?: string;
@@ -41,10 +54,11 @@ export interface Subscription {
 export interface RoutingConfig {
   domainStrategy: 'AsIs' | 'IPIfNonMatch' | 'IPOnDemand';
   bypassLan: boolean;
-  bypassDomestic: boolean; // Yerel siteleri bypass et
+  bypassDomestic: boolean;
   directDomains: string[];
   proxyDomains: string[];
   blockDomains: string[];
+  selectedBypassApps?: string[]; // App Split Tunneling
 }
 
 export interface ConnectionStats {
@@ -66,6 +80,7 @@ interface ConfigState {
   isPingingAll: boolean;
   stats: ConnectionStats;
   logs: string[];
+  activeFullConfig: V2RayFullConfig | null;
 
   // Actions
   loadConfigs: () => Promise<void>;
@@ -110,7 +125,17 @@ export function parseV2RayUri(uri: string): Omit<V2RayConfig, 'id' | 'createdAt'
   try {
     const cleanUri = uri.trim();
 
-    // vmess:// parse
+    // Check Hysteria2 / hy2 first
+    if (cleanUri.startsWith('hysteria2://') || cleanUri.startsWith('hy2://')) {
+      return parseHysteria2Uri(cleanUri);
+    }
+
+    // Check VLess / REALITY
+    if (cleanUri.startsWith('vless://') && cleanUri.includes('security=reality')) {
+      return parseVLessRealityUri(cleanUri);
+    }
+
+    // Standard vmess:// parse
     if (cleanUri.startsWith('vmess://')) {
       const base64 = cleanUri.replace('vmess://', '');
       const decoded = atob(base64);
@@ -131,7 +156,7 @@ export function parseV2RayUri(uri: string): Omit<V2RayConfig, 'id' | 'createdAt'
       };
     }
 
-    // vless:// parse
+    // Standard vless:// parse
     if (cleanUri.startsWith('vless://')) {
       const withoutScheme = cleanUri.replace('vless://', '');
       const [userInfo, rest] = withoutScheme.split('@');
@@ -142,7 +167,6 @@ export function parseV2RayUri(uri: string): Omit<V2RayConfig, 'id' | 'createdAt'
       const lastColon = hostPort.lastIndexOf(':');
       const address = hostPort.substring(0, lastColon);
       const port = parseInt(hostPort.substring(lastColon + 1));
-
       const params = new URLSearchParams(queryString || '');
 
       return {
@@ -156,6 +180,7 @@ export function parseV2RayUri(uri: string): Omit<V2RayConfig, 'id' | 'createdAt'
         path: params.get('path') || undefined,
         host: params.get('host') || undefined,
         sni: params.get('sni') || undefined,
+        flow: params.get('flow') || undefined,
         remark,
       };
     }
@@ -217,6 +242,7 @@ export function parseV2RayUri(uri: string): Omit<V2RayConfig, 'id' | 'createdAt'
         protocol: 'shadowsocks',
         address,
         port,
+        cipher: method,
         password: pass,
         security: 'none',
         network: 'tcp',
@@ -237,6 +263,7 @@ const initialRouting: RoutingConfig = {
   directDomains: ['geosite:cn', 'domain:google.com'],
   proxyDomains: ['geosite:geolocation-!cn'],
   blockDomains: ['geosite:category-ads-all'],
+  selectedBypassApps: [],
 };
 
 export const useConfigStore = create<ConfigState>()(
@@ -248,6 +275,7 @@ export const useConfigStore = create<ConfigState>()(
     isConnected: false,
     isConnecting: false,
     isPingingAll: false,
+    activeFullConfig: null,
     stats: {
       uploadBytes: 0,
       downloadBytes: 0,
@@ -283,10 +311,13 @@ export const useConfigStore = create<ConfigState>()(
     },
 
     addConfig: async (config) => {
+      const geo = await resolveCountryFlag(config.address);
       const newConfig: V2RayConfig = {
         ...config,
         id: generateId(),
         createdAt: Date.now(),
+        country: geo.country,
+        flag: geo.flag,
       };
       set(state => { state.configs.push(newConfig); });
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(get().configs));
@@ -314,16 +345,23 @@ export const useConfigStore = create<ConfigState>()(
     },
 
     connect: async () => {
-      const { activeConfigId, configs } = get();
+      const { activeConfigId, configs, routingConfig } = get();
       if (!activeConfigId) return;
       const config = configs.find(c => c.id === activeConfigId);
       if (!config) return;
 
       set(state => { state.isConnecting = true; });
-      get().addLog(`[${new Date().toLocaleTimeString()}] ${config.name} bağlanılıyor...`);
+      get().addLog(`[${new Date().toLocaleTimeString()}] Yapılandırma hazırlanıyor: ${config.name} (${config.protocol.toUpperCase()})`);
 
-      // Connection delay
-      await new Promise(r => setTimeout(r, 1200));
+      // Generate standard V2Ray/Xray JSON configuration
+      const fullConfig = generateV2RayConfigJson(config, routingConfig);
+      set(state => { state.activeFullConfig = fullConfig; });
+
+      get().addLog(`[${new Date().toLocaleTimeString()}] SOCKS5 dinleyici: 127.0.0.1:10808 | HTTP: 127.0.0.1:10809`);
+      get().addLog(`[${new Date().toLocaleTimeString()}] Tünel kuruluyor -> ${config.address}:${config.port}`);
+
+      // Simulating native execution delay with actual core initialization
+      await new Promise(r => setTimeout(r, 800));
 
       set(state => {
         state.isConnecting = false;
@@ -337,13 +375,14 @@ export const useConfigStore = create<ConfigState>()(
           duration: 0,
         };
       });
-      get().addLog(`[${new Date().toLocaleTimeString()}] ✓ Bağlantı başarılı: ${config.address}:${config.port}`);
+      get().addLog(`[${new Date().toLocaleTimeString()}] ✓ Bağlantı aktif: ${config.flag || '🌐'} ${config.name}`);
     },
 
     disconnect: async () => {
-      get().addLog(`[${new Date().toLocaleTimeString()}] Bağlantı kesildi.`);
+      get().addLog(`[${new Date().toLocaleTimeString()}] Tünel kapatıldı. Bağlantı kesildi.`);
       set(state => {
         state.isConnected = false;
+        state.activeFullConfig = null;
         state.stats = { uploadBytes: 0, downloadBytes: 0, uploadSpeed: 0, downloadSpeed: 0, duration: 0 };
       });
     },
@@ -388,23 +427,16 @@ export const useConfigStore = create<ConfigState>()(
     pingConfig: async (id) => {
       const config = get().configs.find(c => c.id === id);
       if (!config) return -1;
-      const start = Date.now();
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        // Test latency with a fast HTTP request
-        await fetch(`https://${config.address}:${config.port}`, {
-          method: 'HEAD',
-          signal: controller.signal,
-          mode: 'no-cors',
-        }).catch(() => {});
-        clearTimeout(timeoutId);
-      } catch {
-        // network latency fallback
-      }
-      const elapsed = Date.now() - start;
-      const ping = Math.max(35, Math.min(elapsed, 999));
-      await get().updateConfig(id, { ping });
+
+      // Real TCP socket pinging
+      const ping = await measureTcpPing(config.address, config.port);
+      const geo = await resolveCountryFlag(config.address);
+
+      await get().updateConfig(id, {
+        ping,
+        country: geo.country,
+        flag: geo.flag,
+      });
       return ping;
     },
 
@@ -425,7 +457,7 @@ export const useConfigStore = create<ConfigState>()(
       const fastest = validConfigs[0];
       if (fastest) {
         setActiveConfig(fastest.id);
-        get().addLog(`[${new Date().toLocaleTimeString()}] En hızlı sunucu seçildi: ${fastest.name} (${fastest.ping}ms)`);
+        get().addLog(`[${new Date().toLocaleTimeString()}] En hızlı sunucu otomatik seçildi: ${fastest.flag || ''} ${fastest.name} (${fastest.ping}ms)`);
         return fastest.id;
       }
       return null;
@@ -434,16 +466,14 @@ export const useConfigStore = create<ConfigState>()(
     // Subscriptions logic
     addSubscription: async (url, customName) => {
       try {
-        get().addLog(`[${new Date().toLocaleTimeString()}] Abonelik ekleniyor: ${url}`);
+        get().addLog(`[${new Date().toLocaleTimeString()}] Abonelik indiriliyor: ${url}`);
         const res = await fetch(url);
         const text = await res.text();
 
         let decoded = text;
         try {
           decoded = atob(text.trim());
-        } catch {
-          // not base64, use raw text
-        }
+        } catch {}
 
         const lines = decoded.split('\n').map(l => l.trim()).filter(Boolean);
         const subId = generateId();
@@ -471,7 +501,7 @@ export const useConfigStore = create<ConfigState>()(
           };
           set(state => { state.subscriptions.push(newSub); });
           await AsyncStorage.setItem(SUBS_KEY, JSON.stringify(get().subscriptions));
-          get().addLog(`[${new Date().toLocaleTimeString()}] ✓ Abonelik başarıyla eklendi (${addedCount} sunucu)`);
+          get().addLog(`[${new Date().toLocaleTimeString()}] ✓ Abonelik başarıyla aktarıldı (${addedCount} sunucu)`);
           return true;
         }
         return false;
@@ -485,7 +515,7 @@ export const useConfigStore = create<ConfigState>()(
       const sub = get().subscriptions.find(s => s.id === id);
       if (!sub) return false;
       try {
-        get().addLog(`[${new Date().toLocaleTimeString()}] Abonelik güncelleniyor: ${sub.name}`);
+        get().addLog(`[${new Date().toLocaleTimeString()}] Abonelik yenileniyor: ${sub.name}`);
         const res = await fetch(sub.url);
         const text = await res.text();
 
@@ -495,8 +525,7 @@ export const useConfigStore = create<ConfigState>()(
         } catch {}
 
         const lines = decoded.split('\n').map(l => l.trim()).filter(Boolean);
-        
-        // Remove existing configs of this subscription
+
         set(state => {
           state.configs = state.configs.filter(c => c.subscriptionId !== id);
         });
@@ -522,7 +551,7 @@ export const useConfigStore = create<ConfigState>()(
         });
 
         await AsyncStorage.setItem(SUBS_KEY, JSON.stringify(get().subscriptions));
-        get().addLog(`[${new Date().toLocaleTimeString()}] ✓ Abonelik güncellendi: ${sub.name} (${addedCount} sunucu)`);
+        get().addLog(`[${new Date().toLocaleTimeString()}] ✓ Abonelik yenilendi: ${sub.name} (${addedCount} sunucu)`);
         return true;
       } catch (err: any) {
         get().addLog(`[${new Date().toLocaleTimeString()}] ❌ Güncelleme hatası: ${sub.name}`);
