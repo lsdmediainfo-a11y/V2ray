@@ -103,17 +103,29 @@ jobs:
               @Override public String getName() { return MODULE_NAME; }
               @ReactMethod public void startVpn(String configJson, Promise promise) {
                   try {
-                      Intent intent = VpnService.prepare(reactContext);
-                      if (intent != null) {
-                          intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                          reactContext.startActivity(intent);
-                          promise.resolve(false);
-                          return;
-                      }
-                      Intent startIntent = new Intent(reactContext, V2RayVpnService.class);
-                      reactContext.startService(startIntent);
+                      File configFile = new File(reactContext.getCacheDir(), "config.json");
+                      java.io.FileWriter writer = new java.io.FileWriter(configFile);
+                      writer.write(configJson);
+                      writer.close();
+                      String configPath = configFile.getAbsolutePath();
+                      Log.i(MODULE_NAME, "Config written to " + configPath);
+                      
+                      // Run libXray (SOCKS5 Mode)
+                      new Thread(new Runnable() {
+                          @Override
+                          public void run() {
+                              try {
+                                  String invokeReq = "{\"apiVersion\":1,\"method\":\"runXray\",\"payload\":{\"configPath\":\"" + configPath + "\"}}";
+                                  String response = libXray.LibXray.invoke(invokeReq);
+                                  Log.i(MODULE_NAME, "libXray response: " + response);
+                              } catch (Exception ex) {
+                                  Log.e(MODULE_NAME, "libXray error", ex);
+                              }
+                          }
+                      }).start();
+                      
                       emitEvent("onVpnStatusChanged", "CONNECTED");
-                      emitEvent("onVpnLogMessage", "[Native VPN] VpnService starting with configuration...");
+                      emitEvent("onVpnLogMessage", "[Native VPN] SOCKS5 Xray-core started (127.0.0.1:10808)!");
                       promise.resolve(true);
                   } catch (Exception e) { promise.reject("VPN_ERROR", e.getMessage()); }
               }
@@ -164,6 +176,16 @@ jobs:
         run: |
           mkdir -p android/app/src/main/assets
           npx expo export:embed --platform android --dev false --entry-file node_modules/expo/AppEntry.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+
+      - name: Download and Include libXray.aar
+        run: |
+          mkdir -p android/app/libs
+          curl -sL -o /tmp/libxray.zip https://github.com/XTLS/libXray/releases/download/v26.7.11/libxray-android.zip
+          unzip -q -o /tmp/libxray.zip -d /tmp/libxray-extracted
+          cp /tmp/libxray-extracted/libxray-android/libXray.aar android/app/libs/
+          
+          # Inject libXray dependency into build.gradle
+          sed -i 's/dependencies {/dependencies {\n    implementation fileTree(dir: "libs", include: ["*.aar"])\n/g' android/app/build.gradle
 
       - name: Build Standalone APK
         run: |
