@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { useConfigStore } from '../store/configStore';
 import { Colors, Spacing, Radius, Typography, Shadow } from '../utils/theme';
 
@@ -62,6 +63,7 @@ function SettingsRow({
 }
 
 export function SettingsScreen() {
+  const navigation = useNavigation<any>();
   const { configs, clearLogs, routingConfig, updateRoutingConfig } = useConfigStore();
 
   const [autoConnect, setAutoConnect] = useState(false);
@@ -101,6 +103,13 @@ export function SettingsScreen() {
           </View>
 
           <SettingsSection title="Bağlantı">
+            <SettingsRow
+              icon="apps-outline"
+              iconColor={Colors.primary}
+              label="Uygulama Bölünmüş Tünelleme"
+              sublabel="VPN dışı bırakılacak uygulamaları seçin"
+              onPress={() => navigation.navigate('AppSplitTunnel')}
+            />
             <SettingsRow
               icon="flash-outline"
               iconColor={Colors.warning}

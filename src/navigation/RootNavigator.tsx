@@ -16,6 +16,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { LogsScreen } from '../screens/LogsScreen';
 import { ServerDetailScreen } from '../screens/ServerDetailScreen';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
+import { AppSplitTunnelScreen } from '../screens/AppSplitTunnelScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -121,6 +122,13 @@ export function RootNavigator() {
       <Stack.Screen
         name="ServerDetail"
         component={ServerDetailScreen}
+        options={{
+          presentation: 'card',
+        }}
+      />
+      <Stack.Screen
+        name="AppSplitTunnel"
+        component={AppSplitTunnelScreen}
         options={{
           presentation: 'card',
         }}

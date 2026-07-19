@@ -29,6 +29,7 @@ const PROTOCOLS: { key: Protocol; label: string; color: string }[] = [
   { key: 'vless', label: 'VLess', color: Colors.vless },
   { key: 'trojan', label: 'Trojan', color: Colors.trojan },
   { key: 'shadowsocks', label: 'SS', color: Colors.shadowsocks },
+  { key: 'hysteria2', label: 'Hysteria2', color: '#EC4899' },
 ];
 
 const NETWORKS = ['tcp', 'ws', 'grpc', 'h2', 'kcp'] as const;
