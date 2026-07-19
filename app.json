@@ -42,7 +42,8 @@
         {
           "cameraPermission": "QR kod taramak için kamera izni gerekiyor."
         }
-      ]
+      ],
+      "./withVpnService.js"
     ],
     "extra": {
       "eas": {
