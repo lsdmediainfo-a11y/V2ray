@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useConfigStore } from '../store/configStore';
 import { SpeedGraph } from '../components/SpeedGraph';
+import { SpeedTestModal } from '../components/SpeedTestModal';
 import {
   Colors,
   Spacing,
@@ -142,6 +143,7 @@ export function HomeScreen() {
   } = useConfigStore();
 
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [speedTestVisible, setSpeedTestVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
 
   // Speed history for SVG Graph
@@ -328,6 +330,13 @@ export function HomeScreen() {
           <View style={styles.quickActions}>
             <TouchableOpacity
               style={styles.quickBtn}
+              onPress={() => setSpeedTestVisible(true)}
+            >
+              <Ionicons name="speedometer-outline" size={22} color={Colors.warning} />
+              <Text style={styles.quickBtnText}>Hız Testi</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickBtn}
               onPress={() => navigation.navigate('Servers')}
             >
               <Ionicons name="server-outline" size={22} color={Colors.primary} />
@@ -350,6 +359,11 @@ export function HomeScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      <SpeedTestModal
+        visible={speedTestVisible}
+        onClose={() => setSpeedTestVisible(false)}
+      />
     </View>
   );
 }

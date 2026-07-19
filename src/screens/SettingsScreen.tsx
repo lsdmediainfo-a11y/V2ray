@@ -14,7 +14,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
 import { useConfigStore } from '../store/configStore';
+import { generateFullBackupJson, generateBulkUriString } from '../utils/backupService';
 import { Colors, Spacing, Radius, Typography, Shadow } from '../utils/theme';
 
 function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -215,6 +217,35 @@ export function SettingsScreen() {
             />
           </SettingsSection>
 
+          <SettingsSection title="Yedekleme & Dışa Aktar">
+            <SettingsRow
+              icon="download-outline"
+              iconColor={Colors.primary}
+              label="Tüm Sunucuları URI Olarak Kopyala"
+              sublabel="Tüm aktif konfigürasyonları pano'ya kopyala"
+              onPress={async () => {
+                const bulk = generateBulkUriString();
+                if (!bulk) {
+                  Alert.alert('Bilgi', 'Kopyalanacak sunucu bulunamadı.');
+                  return;
+                }
+                await Clipboard.setStringAsync(bulk);
+                Alert.alert('Başarılı', 'Tüm sunucu URI bağlantıları panoya kopyalandı!');
+              }}
+            />
+            <SettingsRow
+              icon="cloud-download-outline"
+              iconColor={Colors.secondary}
+              label="Yedekleme Dosyası (JSON) Oluştur"
+              sublabel="Tüm ayarları ve sunucuları JSON olarak kopyala"
+              onPress={async () => {
+                const json = generateFullBackupJson();
+                await Clipboard.setStringAsync(json);
+                Alert.alert('Başarılı', 'Yedekleme JSON verisi panoya kopyalandı!');
+              }}
+            />
+          </SettingsSection>
+
           <SettingsSection title="Uygulama">
             <SettingsRow
               icon="document-text-outline"
@@ -227,7 +258,7 @@ export function SettingsScreen() {
               iconColor={Colors.secondary}
               label="Hakkında"
               sublabel="V2Ray Protokol Destekli İstemci"
-              onPress={() => Alert.alert('V2Ray Client', 'Sürüm: 1.0.0\n\nVMess, VLess, Trojan, Shadowsocks protokolleri desteklenir.\n\nBu uygulama sadece eğitim ve test amaçlıdır.')}
+              onPress={() => Alert.alert('V2Ray Client', 'Sürüm: 1.0.0\n\nVMess, VLess, Trojan, Shadowsocks, Hysteria2 protokolleri desteklenir.\n\nBu uygulama sadece eğitim ve test amaçlıdır.')}
             />
             <SettingsRow
               icon="trash-outline"

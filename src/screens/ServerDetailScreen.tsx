@@ -53,39 +53,10 @@ function InfoRow({ label, value, mono = false, copyable = false }: {
   );
 }
 
-function generateVmessUri(config: any): string {
-  const obj = {
-    v: '2',
-    ps: config.name,
-    add: config.address,
-    port: String(config.port),
-    id: config.uuid || '',
-    aid: String(config.alterId || 0),
-    net: config.network,
-    type: 'none',
-    host: config.host || '',
-    path: config.path || '',
-    tls: config.security === 'tls' ? 'tls' : '',
-  };
-  return 'vmess://' + btoa(JSON.stringify(obj));
-}
+import { serializeConfigToUri } from '../utils/backupService';
 
 function generateShareUri(config: any): string {
-  const proto = config.protocol;
-  if (proto === 'vmess') return generateVmessUri(config);
-  if (proto === 'vless') {
-    const params = new URLSearchParams();
-    if (config.security !== 'none') params.set('security', config.security);
-    if (config.network !== 'tcp') params.set('type', config.network);
-    if (config.path) params.set('path', config.path);
-    if (config.sni) params.set('sni', config.sni);
-    const q = params.toString();
-    return `vless://${config.uuid}@${config.address}:${config.port}${q ? '?' + q : ''}#${encodeURIComponent(config.name)}`;
-  }
-  if (proto === 'trojan') {
-    return `trojan://${config.password}@${config.address}:${config.port}#${encodeURIComponent(config.name)}`;
-  }
-  return `ss://${btoa(`aes-256-gcm:${config.password}`)}@${config.address}:${config.port}#${encodeURIComponent(config.name)}`;
+  return serializeConfigToUri(config) || `${config.protocol}://${config.address}:${config.port}`;
 }
 
 export function ServerDetailScreen() {
