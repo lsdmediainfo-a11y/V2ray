@@ -267,6 +267,67 @@ const initialRouting: RoutingConfig = {
   selectedBypassApps: [],
 };
 
+const DEFAULT_DEMO_CONFIGS: Omit<V2RayConfig, 'id' | 'createdAt'>[] = [
+  {
+    name: '🇺🇸 US Fast - VLess REALITY',
+    protocol: 'vless',
+    address: 'us.v2ray.demo.net',
+    port: 443,
+    uuid: 'a3f8c2b1-9e4d-4c3a-8b1e-7f6a5d4c3b2a',
+    security: 'reality',
+    network: 'tcp',
+    sni: 'yahoo.com',
+    publicKey: '7f6a5d4c3b2a1e9d8c7b6a5f4e3d2c1b0a9f8e7d',
+    shortId: '6ba7b810',
+    fingerprint: 'chrome',
+    ping: 45,
+    country: 'United States',
+    flag: '🇺🇸',
+  },
+  {
+    name: '🇩🇪 DE HighSpeed - VMess WS',
+    protocol: 'vmess',
+    address: 'de.v2ray.demo.net',
+    port: 443,
+    uuid: 'c5d4e3f2-1a2b-3c4d-5e6f-7a8b9c0d1e2f',
+    security: 'tls',
+    network: 'ws',
+    path: '/vmess-ws',
+    host: 'de.v2ray.demo.net',
+    sni: 'de.v2ray.demo.net',
+    ping: 38,
+    country: 'Germany',
+    flag: '🇩🇪',
+  },
+  {
+    name: '🇳🇱 NL Privacy - Trojan TLS',
+    protocol: 'trojan',
+    address: 'nl.v2ray.demo.net',
+    port: 443,
+    password: 'trojan-password-demo',
+    security: 'tls',
+    network: 'tcp',
+    sni: 'nl.v2ray.demo.net',
+    ping: 42,
+    country: 'Netherlands',
+    flag: '🇳🇱',
+  },
+  {
+    name: '🇹🇷 TR Local Node - Hysteria2',
+    protocol: 'hysteria2',
+    address: 'tr.v2ray.demo.net',
+    port: 8443,
+    password: 'hy2-password-demo',
+    uuid: 'hy2-password-demo',
+    security: 'tls',
+    network: 'kcp',
+    sni: 'tr.v2ray.demo.net',
+    ping: 18,
+    country: 'Türkiye',
+    flag: '🇹🇷',
+  },
+];
+
 export const useConfigStore = create<ConfigState>()(
   immer((set, get) => ({
     configs: [],
@@ -295,17 +356,37 @@ export const useConfigStore = create<ConfigState>()(
           AsyncStorage.getItem(ACTIVE_KEY),
         ]);
         if (configsJson) {
-          set(state => { state.configs = JSON.parse(configsJson); });
+          const parsed = JSON.parse(configsJson);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            set(state => { state.configs = parsed; });
+          } else {
+            // Populate demo servers
+            for (const demo of DEFAULT_DEMO_CONFIGS) {
+              await get().addConfig(demo);
+            }
+          }
+        } else {
+          // First launch: initialize default demo servers
+          for (const demo of DEFAULT_DEMO_CONFIGS) {
+            await get().addConfig(demo);
+          }
         }
+
         if (subsJson) {
           set(state => { state.subscriptions = JSON.parse(subsJson); });
         }
         if (routingJson) {
           set(state => { state.routingConfig = JSON.parse(routingJson); });
         }
-        if (activeId) {
+        if (activeId && get().configs.some(c => c.id === activeId)) {
           set(state => { state.activeConfigId = activeId; });
+        } else if (get().configs.length > 0) {
+          const firstId = get().configs[0].id;
+          set(state => { state.activeConfigId = firstId; });
+          AsyncStorage.setItem(ACTIVE_KEY, firstId);
         }
+
+        get().addLog(`[${new Date().toLocaleTimeString()}] ✓ V2Ray İstemcisi başlatıldı. SOCKS5: 10808 | HTTP: 10809`);
       } catch (err) {
         console.error('loadConfigs error:', err);
       }

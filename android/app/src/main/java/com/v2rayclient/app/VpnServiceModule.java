@@ -1,4 +1,4 @@
-package com.v2rayclient;
+package com.v2rayclient.app;
 
 import android.content.Intent;
 import android.net.VpnService;
@@ -28,8 +28,8 @@ public class VpnServiceModule extends ReactContextBaseJavaModule {
         try {
             Intent intent = VpnService.prepare(reactContext);
             if (intent != null) {
-                // Needs VPN permission from Android System dialog
-                reactContext.startActivityForResult(intent, 0, null);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                reactContext.startActivity(intent);
             }
             emitEvent("onVpnStatusChanged", "CONNECTED");
             emitEvent("onVpnLogMessage", "[Native VPN] VpnService starting with configuration...");

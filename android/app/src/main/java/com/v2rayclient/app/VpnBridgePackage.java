@@ -1,4 +1,4 @@
-package com.v2rayclient;
+package com.v2rayclient.app;
 
 import com.facebook.react.ReactPackage;
 import com.facebook.react.bridge.NativeModule;
