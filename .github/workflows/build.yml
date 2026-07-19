@@ -39,24 +39,46 @@ jobs:
       - name: Inject Native VPN Bridge Package into Generated Project
         run: |
           mkdir -p android/app/src/main/java/com/v2rayclient/app
+          mkdir -p android/app/src/main/java/com/v2ray/ang/service
+          
+          cat << 'EOF' > android/app/src/main/java/com/v2ray/ang/service/TProxyService.java
+          package com.v2ray.ang.service;
+          public class TProxyService {
+              public static native void TProxyStartService(String configPath, int fd);
+              public static native void TProxyStopService();
+              public static native long[] TProxyGetStats();
+              static { System.loadLibrary("hev-socks5-tunnel"); }
+          }
+          EOF
+
           cat << 'EOF' > android/app/src/main/java/com/v2rayclient/app/V2RayVpnService.java
           package com.v2rayclient.app;
           import android.content.Intent;
           import android.net.VpnService;
           import android.os.ParcelFileDescriptor;
           import android.util.Log;
+          import java.io.File;
+          import java.io.FileWriter;
+          import com.v2ray.ang.service.TProxyService;
+
           public class V2RayVpnService extends VpnService {
               private static final String TAG = "V2RayVpnService";
               private ParcelFileDescriptor vpnInterface = null;
+              private String configJson = "";
+
               @Override
               public int onStartCommand(Intent intent, int flags, int startId) {
                   if (intent != null && "STOP".equals(intent.getAction())) {
                       stopVpn();
                       return START_NOT_STICKY;
                   }
+                  if (intent != null && intent.hasExtra("configJson")) {
+                      configJson = intent.getStringExtra("configJson");
+                  }
                   setupVpn();
                   return START_STICKY;
               }
+
               private void setupVpn() {
                   if (vpnInterface != null) return;
                   try {
@@ -66,20 +88,47 @@ jobs:
                       builder.setSession("V2RayClient");
                       builder.setMtu(1500);
                       vpnInterface = builder.establish();
-                      Log.i(TAG, "VPN Interface established");
+                      Log.i(TAG, "VPN Interface established. FD: " + vpnInterface.getFd());
+
+                      File configFile = new File(getCacheDir(), "config.json");
+                      FileWriter writer = new FileWriter(configFile);
+                      writer.write(configJson);
+                      writer.close();
+                      final String configPath = configFile.getAbsolutePath();
+
+                      new Thread(new Runnable() {
+                          public void run() {
+                              try {
+                                  String invokeReq = "{\"apiVersion\":1,\"method\":\"runXray\",\"payload\":{\"configPath\":\"" + configPath + "\"}}";
+                                  libXray.LibXray.invoke(invokeReq);
+                              } catch(Exception e) {
+                                  Log.e(TAG, "Xray error", e);
+                              }
+                          }
+                      }).start();
+
+                      String tunYaml = "tunnel:\n  mtu: 1500\n  ipv4: 10.0.0.2\nsocks5:\n  port: 10808\n  address: 127.0.0.1\n  udp: 'udp'\nmisc:\n  tcp-read-write-timeout: 300000\n  udp-read-write-timeout: 60000\n  log-level: warn\n";
+                      File tunFile = new File(getCacheDir(), "tun2socks.yaml");
+                      FileWriter twriter = new FileWriter(tunFile);
+                      twriter.write(tunYaml);
+                      twriter.close();
+                      
+                      TProxyService.TProxyStartService(tunFile.getAbsolutePath(), vpnInterface.getFd());
+                      Log.i(TAG, "Tun2Socks started!");
                   } catch (Exception e) {
                       Log.e(TAG, "Failed to establish VPN", e);
                       stopSelf();
                   }
               }
+
               private void stopVpn() {
+                  try { TProxyService.TProxyStopService(); } catch(Exception e){}
                   try {
                       if (vpnInterface != null) { vpnInterface.close(); vpnInterface = null; }
                   } catch (Exception e) { Log.e(TAG, "Failed to close VPN interface", e); }
                   stopSelf();
               }
-              @Override
-              public void onDestroy() { stopVpn(); super.onDestroy(); }
+              @Override public void onDestroy() { stopVpn(); super.onDestroy(); }
           }
           EOF
 
@@ -87,6 +136,7 @@ jobs:
           package com.v2rayclient.app;
           import android.content.Intent;
           import android.net.VpnService;
+          import android.util.Log;
           import com.facebook.react.bridge.Promise;
           import com.facebook.react.bridge.ReactApplicationContext;
           import com.facebook.react.bridge.ReactContextBaseJavaModule;
@@ -103,29 +153,18 @@ jobs:
               @Override public String getName() { return MODULE_NAME; }
               @ReactMethod public void startVpn(String configJson, Promise promise) {
                   try {
-                      File configFile = new File(reactContext.getCacheDir(), "config.json");
-                      java.io.FileWriter writer = new java.io.FileWriter(configFile);
-                      writer.write(configJson);
-                      writer.close();
-                      String configPath = configFile.getAbsolutePath();
-                      Log.i(MODULE_NAME, "Config written to " + configPath);
-                      
-                      // Run libXray (SOCKS5 Mode)
-                      new Thread(new Runnable() {
-                          @Override
-                          public void run() {
-                              try {
-                                  String invokeReq = "{\"apiVersion\":1,\"method\":\"runXray\",\"payload\":{\"configPath\":\"" + configPath + "\"}}";
-                                  String response = libXray.LibXray.invoke(invokeReq);
-                                  Log.i(MODULE_NAME, "libXray response: " + response);
-                              } catch (Exception ex) {
-                                  Log.e(MODULE_NAME, "libXray error", ex);
-                              }
-                          }
-                      }).start();
-                      
+                      Intent intent = VpnService.prepare(reactContext);
+                      if (intent != null) {
+                          intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                          reactContext.startActivity(intent);
+                          promise.resolve(false);
+                          return;
+                      }
+                      Intent startIntent = new Intent(reactContext, V2RayVpnService.class);
+                      startIntent.putExtra("configJson", configJson);
+                      reactContext.startService(startIntent);
                       emitEvent("onVpnStatusChanged", "CONNECTED");
-                      emitEvent("onVpnLogMessage", "[Native VPN] SOCKS5 Xray-core started (127.0.0.1:10808)!");
+                      emitEvent("onVpnLogMessage", "[Native VPN] VpnService + Tun2Socks + Xray starting...");
                       promise.resolve(true);
                   } catch (Exception e) { promise.reject("VPN_ERROR", e.getMessage()); }
               }
@@ -177,14 +216,26 @@ jobs:
           mkdir -p android/app/src/main/assets
           npx expo export:embed --platform android --dev false --entry-file node_modules/expo/AppEntry.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
 
-      - name: Download and Include libXray.aar
+      - name: Download and Include VPN Libraries
         run: |
           mkdir -p android/app/libs
+          mkdir -p android/app/src/main/jniLibs
+          
+          # 1. Download libXray
           curl -sL -o /tmp/libxray.zip https://github.com/XTLS/libXray/releases/download/v26.7.11/libxray-android.zip
           unzip -q -o /tmp/libxray.zip -d /tmp/libxray-extracted
           cp /tmp/libxray-extracted/libxray-android/libXray.aar android/app/libs/
           
-          # Inject libXray dependency into build.gradle
+          # 2. Download v2rayNG to extract tun2socks
+          curl -sL -o /tmp/v2rayng.apk https://github.com/2dust/v2rayNG/releases/download/2.2.6/v2rayNG_2.2.6.apk
+          unzip -q -o /tmp/v2rayng.apk -d /tmp/v2rayng-extracted
+          
+          for arch in arm64-v8a armeabi-v7a x86 x86_64; do
+            mkdir -p android/app/src/main/jniLibs/$arch
+            cp /tmp/v2rayng-extracted/lib/$arch/libhev-socks5-tunnel.so android/app/src/main/jniLibs/$arch/ || true
+          done
+          
+          # Inject dependency into build.gradle
           sed -i 's/dependencies {/dependencies {\n    implementation fileTree(dir: "libs", include: ["*.aar"])\n/g' android/app/build.gradle
 
       - name: Build Standalone APK
