@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateV2RayConfigJson, V2RayFullConfig } from '../utils/configGenerator';
 import { measureTcpPing, resolveCountryFlag } from '../utils/tcpPing';
 import { parseHysteria2Uri, parseVLessRealityUri } from '../utils/hysteriaParser';
+import { startNativeVpn, stopNativeVpn } from '../utils/vpnBridge';
 
 export type Protocol = 'vmess' | 'vless' | 'trojan' | 'shadowsocks' | 'hysteria2' | 'tuic';
 
@@ -360,8 +361,11 @@ export const useConfigStore = create<ConfigState>()(
       get().addLog(`[${new Date().toLocaleTimeString()}] SOCKS5 dinleyici: 127.0.0.1:10808 | HTTP: 127.0.0.1:10809`);
       get().addLog(`[${new Date().toLocaleTimeString()}] Tünel kuruluyor -> ${config.address}:${config.port}`);
 
-      // Simulating native execution delay with actual core initialization
-      await new Promise(r => setTimeout(r, 800));
+      // Execute Native VpnService bridge
+      await startNativeVpn(JSON.stringify(fullConfig));
+
+      // Execution delay
+      await new Promise(r => setTimeout(r, 600));
 
       set(state => {
         state.isConnecting = false;
@@ -379,6 +383,7 @@ export const useConfigStore = create<ConfigState>()(
     },
 
     disconnect: async () => {
+      await stopNativeVpn();
       get().addLog(`[${new Date().toLocaleTimeString()}] Tünel kapatıldı. Bağlantı kesildi.`);
       set(state => {
         state.isConnected = false;
