@@ -1,13 +1,14 @@
-name: Build and Check V2Ray Client
+name: Build V2Ray Client Debug APK
 
 on:
   push:
     branches: [ master, main ]
   pull_request:
     branches: [ master, main ]
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,11 +21,29 @@ jobs:
           node-version: 20
           cache: 'npm'
 
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
       - name: Install Dependencies
         run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
       - name: Type Check (TypeScript)
         run: npx tsc --noEmit
 
-      - name: Check Expo Export
-        run: npx expo export --platform android
+      - name: Expo Prebuild (Generate Android Project)
+        run: npx expo prebuild --platform android --clean
+
+      - name: Build Android Debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: V2RayClient-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
