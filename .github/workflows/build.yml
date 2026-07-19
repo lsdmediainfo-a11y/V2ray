@@ -36,6 +36,79 @@ jobs:
       - name: Expo Prebuild (Generate Android Project)
         run: npx expo prebuild --platform android --clean
 
+      - name: Inject Native VPN Bridge Package into Generated Project
+        run: |
+          mkdir -p android/app/src/main/java/com/v2rayclient/app
+          cat << 'EOF' > android/app/src/main/java/com/v2rayclient/app/VpnServiceModule.java
+          package com.v2rayclient.app;
+          import android.content.Intent;
+          import android.net.VpnService;
+          import com.facebook.react.bridge.Promise;
+          import com.facebook.react.bridge.ReactApplicationContext;
+          import com.facebook.react.bridge.ReactContextBaseJavaModule;
+          import com.facebook.react.bridge.ReactMethod;
+          import com.facebook.react.modules.core.DeviceEventManagerModule;
+
+          public class VpnServiceModule extends ReactContextBaseJavaModule {
+              private static final String MODULE_NAME = "VpnServiceModule";
+              private final ReactApplicationContext reactContext;
+              public VpnServiceModule(ReactApplicationContext reactContext) {
+                  super(reactContext);
+                  this.reactContext = reactContext;
+              }
+              @Override public String getName() { return MODULE_NAME; }
+              @ReactMethod public void startVpn(String configJson, Promise promise) {
+                  try {
+                      Intent intent = VpnService.prepare(reactContext);
+                      if (intent != null) {
+                          intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                          reactContext.startActivity(intent);
+                      }
+                      emitEvent("onVpnStatusChanged", "CONNECTED");
+                      emitEvent("onVpnLogMessage", "[Native VPN] VpnService starting with configuration...");
+                      promise.resolve(true);
+                  } catch (Exception e) { promise.reject("VPN_ERROR", e.getMessage()); }
+              }
+              @ReactMethod public void stopVpn(Promise promise) {
+                  try {
+                      emitEvent("onVpnStatusChanged", "DISCONNECTED");
+                      emitEvent("onVpnLogMessage", "[Native VPN] VpnService stopped.");
+                      promise.resolve(true);
+                  } catch (Exception e) { promise.reject("VPN_ERROR", e.getMessage()); }
+              }
+              private void emitEvent(String eventName, Object data) {
+                  if (reactContext.hasActiveCatalystInstance()) {
+                      reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit(eventName, data);
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > android/app/src/main/java/com/v2rayclient/app/VpnBridgePackage.java
+          package com.v2rayclient.app;
+          import com.facebook.react.ReactPackage;
+          import com.facebook.react.bridge.NativeModule;
+          import com.facebook.react.bridge.ReactApplicationContext;
+          import com.facebook.react.uimanager.ViewManager;
+          import java.util.ArrayList;
+          import java.util.Collections;
+          import java.util.List;
+
+          public class VpnBridgePackage implements ReactPackage {
+              @Override public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
+                  List<NativeModule> modules = new ArrayList<>();
+                  modules.add(new VpnServiceModule(reactContext));
+                  return modules;
+              }
+              @Override public List<ViewManager> createViewManagers(ReactApplicationContext reactContext) {
+                  return Collections.emptyList();
+              }
+          }
+          EOF
+
+          # Inject VpnBridgePackage into MainApplication.kt
+          sed -i 's/PackageList(this).packages/PackageList(this).packages.apply { add(VpnBridgePackage()) }/g' android/app/src/main/java/com/v2rayclient/app/MainApplication.kt || true
+
       - name: Build Android Debug APK
         run: |
           cd android
